@@ -22,21 +22,10 @@ jobs:
           cache: pip
           cache-dependency-path: screener/requirements.txt
 
-      - run: pip install -r requirements.txt
+      - run: pip install setuptools && pip install -r requirements.txt
 
-      - name: Run screener (open)
-        if: github.event.schedule == '30 23 * * 0-4'
-        run: python main.py open
-        env:
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
-
-      - name: Run screener (close / manual)
-        if: github.event.schedule == '0 7 * * 1-5' || github.event_name == 'workflow_dispatch'
-        run: python main.py close
+      - name: Run screener
+        run: python main.py
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
