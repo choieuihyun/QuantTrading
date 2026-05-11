@@ -1,4 +1,3 @@
-pykrx==1.0.45
-setuptools
+pykrx
 pandas
 firebase-admin
