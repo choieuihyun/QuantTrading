@@ -1,0 +1,41 @@
+name: Quant Screener
+
+on:
+  schedule:
+    - cron: "30 23 * * 0-4"  # 08:30 KST Mon-Fri (장 시작 전)
+    - cron: "0 7 * * 1-5"    # 16:00 KST Mon-Fri (장 마감 후)
+  workflow_dispatch:           # 수동 실행
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: screener
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: screener/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Run screener (open)
+        if: github.event.schedule == '30 23 * * 0-4'
+        run: python main.py open
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+
+      - name: Run screener (close / manual)
+        if: github.event.schedule == '0 7 * * 1-5' || github.event_name == 'workflow_dispatch'
+        run: python main.py close
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
