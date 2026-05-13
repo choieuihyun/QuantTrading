@@ -39,6 +39,9 @@ def run(markets=("KOSPI", "KOSDAQ")) -> pd.DataFrame:
     # 중복 컬럼 제거 (rename으로 인한 경우)
     df = df.loc[:, ~df.columns.duplicated()]
 
+    print(f"컬럼 목록: {df.columns.tolist()}")
+    print(df.head(2).to_string())
+
     df = df[df["PER"].notna() & df["PBR"].notna()]
     df = df[df["PER"] > 0]
     df = df[df["PBR"] > 0]
