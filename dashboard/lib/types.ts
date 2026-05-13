@@ -42,6 +42,12 @@ export interface Stock {
   near_52w_high?: boolean;
   // Common
   pattern_hits?: number;
+  // DART 펀더멘털
+  eps_current?: number;
+  eps_prev_year?: number;
+  eps_yoy?: number;
+  rev_yoy?: number;
+  canslim_c?: boolean;
 }
 
 export type PatternKey = "p1" | "p2" | "p3" | "canslim" | "vcp" | "stage2" | "wyckoff" | "darvas" | "common_pro" | "common_all";
