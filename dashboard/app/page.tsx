@@ -1,7 +1,8 @@
 "use client";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { TrendingUp, Activity, RefreshCw, BarChart2, Star, Zap, Layers, Eye, Box, Trophy } from "lucide-react";
+import { TrendingUp, Activity, BarChart2, Star, Zap, Layers, Eye, Box, Trophy } from "lucide-react";
+import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockTable } from "@/components/StockTable";
@@ -47,19 +48,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#080a0f] text-white">
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-bold">Q</div>
-          <span className="font-semibold tracking-tight">QuantTrading</span>
-          <span className="text-xs text-white/30 px-2 py-0.5 bg-white/5 rounded">KOSPI · KOSDAQ</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-white/40">
-          {runAt && <span>마지막 업데이트: {runAt}</span>}
-          <button onClick={() => mutate()} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
-            <RefreshCw size={13} />
-          </button>
-        </div>
-      </header>
+      <Header runAt={runAt ?? undefined} />
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {isLoading ? (
