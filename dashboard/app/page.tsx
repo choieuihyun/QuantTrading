@@ -1,0 +1,126 @@
+"use client";
+import useSWR from "swr";
+import { motion } from "framer-motion";
+import { TrendingUp, Activity, RefreshCw, BarChart2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StockTable } from "@/components/StockTable";
+import { fetchLatestResult } from "@/lib/fetcher";
+
+const PATTERNS = [
+  {
+    key: "p1",
+    label: "정배열 + 매집",
+    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",
+    icon: TrendingUp,
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+  },
+  {
+    key: "p2",
+    label: "5일선 추세",
+    desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",
+    icon: Activity,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+  },
+  {
+    key: "p3",
+    label: "눌림목",
+    desc: "피보나치 되돌림 구간 + MACD 반등",
+    icon: BarChart2,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+  },
+] as const;
+
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white/5 border border-white/10 rounded-xl px-5 py-4 flex flex-col gap-1"
+    >
+      <span className="text-xs text-white/40 uppercase tracking-wider">{label}</span>
+      <span className={`text-2xl font-bold font-mono ${color}`}>{value}</span>
+      <span className="text-xs text-white/30">종목</span>
+    </motion.div>
+  );
+}
+
+export default function Home() {
+  const { data, isLoading, mutate } = useSWR("screener", fetchLatestResult, {
+    refreshInterval: 1000 * 60 * 5,
+  });
+
+  const runAt = data?.run_at
+    ? new Date(data.run_at.seconds * 1000).toLocaleString("ko-KR")
+    : null;
+
+  return (
+    <main className="min-h-screen bg-[#080a0f] text-white">
+      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-bold">Q</div>
+          <span className="font-semibold tracking-tight">QuantTrading</span>
+          <span className="text-xs text-white/30 px-2 py-0.5 bg-white/5 rounded">KOSPI · KOSDAQ</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-white/40">
+          {runAt && <span>마지막 업데이트: {runAt}</span>}
+          <button onClick={() => mutate()} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            <RefreshCw size={13} />
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {isLoading ? (
+          <div className="grid grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 bg-white/5 rounded-xl" />)}
+          </div>
+        ) : data ? (
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard label="정배열 + 매집" value={data.p1_count} color="text-indigo-400" />
+            <StatCard label="5일선 추세"   value={data.p2_count} color="text-emerald-400" />
+            <StatCard label="눌림목"       value={data.p3_count} color="text-amber-400" />
+          </div>
+        ) : null}
+
+        <Tabs defaultValue="p1">
+          <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
+            {PATTERNS.map((p) => {
+              const Icon = p.icon;
+              return (
+                <TabsTrigger
+                  key={p.key}
+                  value={p.key}
+                  className="flex items-center gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 rounded-lg px-4 py-2 text-sm transition-all"
+                >
+                  <Icon size={14} className={p.color} />
+                  {p.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          {PATTERNS.map((p) => (
+            <TabsContent key={p.key} value={p.key} className="mt-4">
+              <div className={`mb-4 px-4 py-3 rounded-xl ${p.bg} border border-white/5`}>
+                <p className="text-sm text-white/60">{p.desc}</p>
+              </div>
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 bg-white/5 rounded-lg" />)}
+                </div>
+              ) : data ? (
+                <StockTable data={data[p.key as "p1" | "p2" | "p3"] ?? []} pattern={p.key as "p1" | "p2" | "p3"} />
+              ) : (
+                <div className="py-20 text-center text-white/30">데이터가 없습니다</div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
+    </main>
+  );
+}
