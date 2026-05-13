@@ -3,6 +3,8 @@ import sys
 import screener
 import firebase_upload
 import dart_fetcher
+import backtest
+from datetime import datetime, timedelta
 
 PATTERN_NAMES = {
     "p1":         "정배열 퍼지기 직전 + 매집",
@@ -51,7 +53,13 @@ def main():
                 cols.append("canslim_c")
             print(df[cols].head(5).to_string())
 
-    firebase_upload.upload(results, run_type=run_type)
+    # ── 백테스트 ───────────────────────────────────────────
+    today = datetime.today()
+    bt_start = screener._last_weekday(today - timedelta(days=270))
+    print("\n백테스트 실행 중...")
+    bt_results = backtest.run(results, bt_start)
+
+    firebase_upload.upload(results, run_type=run_type, backtest=bt_results)
     print("\nDone.")
 
 

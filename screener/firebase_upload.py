@@ -25,7 +25,7 @@ def _to_native(val):
     return val
 
 
-def upload(results: dict, run_type: str = "auto"):
+def upload(results: dict, run_type: str = "auto", backtest: dict = None):
     _init_app()
     db = firestore.client()
 
@@ -46,6 +46,8 @@ def upload(results: dict, run_type: str = "auto"):
         data[key] = records
         data[f"{key}_count"] = len(records)
 
+    if backtest:
+        data["backtest"] = backtest
+
     db.collection("screener_results").document(doc_id).set(data)
     print(f"Uploaded → screener_results/{doc_id}")
-    print(f"  p1: {data['p1_count']}종목 | p2: {data['p2_count']}종목 | p3: {data['p3_count']}종목")

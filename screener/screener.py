@@ -30,9 +30,9 @@ def _get_market_return(start_date: str) -> float:
         return 0.0
 
 
-def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | None:
+def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0) -> dict | None:
+    """DataFrame을 직접 받아 신호 계산 (백테스트에서도 재사용)"""
     try:
-        hist = fdr.DataReader(ticker, start_date)
         if hist.empty or len(hist) < 120:
             return None
 
@@ -171,6 +171,14 @@ def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | N
             "stop_swing":         stop_swing,
             "stop_lt":            stop_lt,
         }
+    except Exception:
+        return None
+
+
+def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | None:
+    try:
+        hist = fdr.DataReader(ticker, start_date)
+        return calc_signals_from_df(hist, market_return)
     except Exception:
         return None
 
