@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-import OpenDartReader
+from OpenDartReader import OpenDartReader
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 
-def _client() -> OpenDartReader.OpenDartReader:
-    return OpenDartReader.OpenDartReader(os.environ["DART_API_KEY"])
+def _client() -> OpenDartReader:
+    return OpenDartReader(os.environ["DART_API_KEY"])
 
 
 def _parse_amount(val) -> int | None:
@@ -18,7 +18,7 @@ def _parse_amount(val) -> int | None:
         return None
 
 
-def _fetch_one(dart: OpenDartReader.OpenDartReader, ticker: str) -> dict:
+def _fetch_one(dart: OpenDartReader, ticker: str) -> dict:
     base = {"ticker": ticker, "eps_current": None, "eps_prev_year": None,
             "eps_yoy": None, "rev_yoy": None, "canslim_c": False}
     try:
