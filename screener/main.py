@@ -55,7 +55,7 @@ def main():
 
     # ── 백테스트 ───────────────────────────────────────────
     today = datetime.today()
-    bt_start = screener._last_weekday(today - timedelta(days=270))
+    bt_start = screener._last_weekday(today - timedelta(days=500))  # 2년치 데이터
     print("\n백테스트 실행 중...")
     bt_results = backtest.run(results, bt_start)
 
