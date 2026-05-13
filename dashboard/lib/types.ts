@@ -50,6 +50,7 @@ export interface Stock {
   canslim_c?: boolean;
 }
 
+export type MarketKey = "kr" | "us" | "crypto";
 export type PatternKey = "p1" | "p2" | "p3" | "canslim" | "vcp" | "stage2" | "wyckoff" | "darvas" | "common_trend" | "common_accum" | "common_all";
 
 export interface ScreenerResult {

@@ -11,31 +11,34 @@ from screener import (
 from datetime import datetime, timedelta
 
 HOLD_DAYS = [20, 60]
-SCAN_INTERVAL = 5      # 매 5거래일(1주)마다 신호 체크
-MIN_HIST = 120         # 신호 계산 최소 필요 데이터
+SCAN_INTERVAL = 5
+MIN_HIST = 120
 
 
-def _is_trend_signal(s: dict) -> bool:
+def _is_trend_signal(s: dict, cfg: dict = None) -> bool:
+    t = cfg.get("score_threshold", SCORE_THRESHOLD) if cfg else SCORE_THRESHOLD
     hits = sum([
-        _score_stage2(s)  >= SCORE_THRESHOLD,
-        _score_canslim(s) >= SCORE_THRESHOLD,
-        _score_darvas(s)  >= SCORE_THRESHOLD,
+        _score_stage2(s, cfg)  >= t,
+        _score_canslim(s, cfg) >= t,
+        _score_darvas(s, cfg)  >= t,
     ])
     return hits >= 2
 
 
-def _is_accum_signal(s: dict) -> bool:
+def _is_accum_signal(s: dict, cfg: dict = None) -> bool:
+    t = cfg.get("score_threshold", SCORE_THRESHOLD) if cfg else SCORE_THRESHOLD
     return (
-        _score_wyckoff(s) >= SCORE_THRESHOLD and
-        _score_vcp(s)     >= SCORE_THRESHOLD
+        _score_wyckoff(s, cfg) >= t and
+        _score_vcp(s, cfg)     >= t
     )
 
 
-def _is_custom_signal(s: dict) -> bool:
+def _is_custom_signal(s: dict, cfg: dict = None) -> bool:
+    t = cfg.get("score_threshold", SCORE_THRESHOLD) if cfg else SCORE_THRESHOLD
     hits = sum([
-        _score_p1(s) >= SCORE_THRESHOLD,
-        _score_p2(s) >= SCORE_THRESHOLD,
-        _score_p3(s) >= SCORE_THRESHOLD,
+        _score_p1(s, cfg) >= t,
+        _score_p2(s, cfg) >= t,
+        _score_p3(s, cfg) >= t,
     ])
     return hits >= 2
 
@@ -47,7 +50,7 @@ SIGNAL_FNS = {
 }
 
 
-def _backtest_ticker(ticker: str, hist: pd.DataFrame, category: str) -> list[dict]:
+def _backtest_ticker(ticker: str, hist: pd.DataFrame, category: str, cfg: dict = None) -> list[dict]:
     signal_fn = SIGNAL_FNS[category]
     trades = []
     total = len(hist)
@@ -55,10 +58,10 @@ def _backtest_ticker(ticker: str, hist: pd.DataFrame, category: str) -> list[dic
 
     for i in range(MIN_HIST, max_check, SCAN_INTERVAL):
         window = hist.iloc[:i + 1]
-        signals = calc_signals_from_df(window, market_return=0.0)
+        signals = calc_signals_from_df(window, market_return=0.0, cfg=cfg)
         if signals is None:
             continue
-        if not signal_fn(signals):
+        if not signal_fn(signals, cfg=cfg):
             continue
 
         entry_price = float(hist["Close"].iloc[i])
@@ -111,7 +114,7 @@ def _calc_stats(trades: list[dict], category: str) -> dict:
     return stats
 
 
-def run(results: dict, start_date: str) -> dict:
+def run(results: dict, start_date: str, cfg: dict = None) -> dict:
     """
     results: screener.run()의 반환값
     start_date: 데이터 시작일 (screener와 동일)
@@ -159,7 +162,7 @@ def run(results: dict, start_date: str) -> dict:
             hist = hist_cache.get(ticker)
             if hist is None or len(hist) < MIN_HIST + max(HOLD_DAYS):
                 continue
-            trades = _backtest_ticker(ticker, hist, cat)
+            trades = _backtest_ticker(ticker, hist, cat, cfg=cfg)
             all_trades.extend(trades)
 
         stats = _calc_stats(all_trades, cat)

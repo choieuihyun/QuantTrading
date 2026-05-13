@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def _last_weekday(dt: datetime) -> str:
-    while dt.weekday() >= 5:
-        dt -= timedelta(days=1)
+def _last_weekday(dt: datetime, skip_weekends: bool = True) -> str:
+    if skip_weekends:
+        while dt.weekday() >= 5:
+            dt -= timedelta(days=1)
     return dt.strftime("%Y-%m-%d")
 
 
@@ -18,19 +19,22 @@ def _calc_rsi(close: pd.Series, period=14) -> float:
     return float((100 - 100 / (1 + rs)).iloc[-1])
 
 
-def _get_market_return(start_date: str) -> float:
+def _get_market_return(start_date: str, benchmark: str = "KS11") -> float:
     try:
-        kospi = fdr.DataReader("KS11", start_date)
-        if kospi.empty or len(kospi) < 2:
+        data = fdr.DataReader(benchmark, start_date)
+        if data.empty or len(data) < 2:
             return 0.0
-        ref = float(kospi["Close"].iloc[-65]) if len(kospi) >= 65 else float(kospi["Close"].iloc[0])
-        now = float(kospi["Close"].iloc[-1])
+        ref = float(data["Close"].iloc[-65]) if len(data) >= 65 else float(data["Close"].iloc[0])
+        now = float(data["Close"].iloc[-1])
         return round((now - ref) / ref, 4)
     except Exception:
         return 0.0
 
 
-def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0) -> dict | None:
+def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: dict = None) -> dict | None:
+    from market_config import KR_CONFIG
+    if cfg is None:
+        cfg = KR_CONFIG
     """DataFrame을 직접 받아 신호 계산 (백테스트에서도 재사용)"""
     try:
         if hist.empty or len(hist) < 120:
@@ -112,7 +116,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0) -> dict
         fib_38            = recent_high - (recent_high - prior_low) * 0.382
         fib_62            = recent_high - (recent_high - prior_low) * 0.618
         in_fib_zone       = bool(fib_62 <= price_now <= fib_38)
-        is_pullback_range = bool(-0.15 <= pullback_pct <= -0.03)
+        is_pullback_range = bool(cfg["pullback_min"] <= pullback_pct <= cfg["pullback_max"])
         today_bullish     = float(close.iloc[-1]) > float(open_.iloc[-1])
 
         # ── 양봉 비율 ─────────────────────────────────────────
@@ -175,10 +179,10 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0) -> dict
         return None
 
 
-def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | None:
+def _get_signals(ticker: str, start_date: str, market_return: float, cfg: dict = None) -> dict | None:
     try:
         hist = fdr.DataReader(ticker, start_date)
-        return calc_signals_from_df(hist, market_return)
+        return calc_signals_from_df(hist, market_return, cfg=cfg)
     except Exception:
         return None
 
@@ -187,91 +191,91 @@ def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | N
 # 스코어링 함수
 # ══════════════════════════════════════════════════════
 
-def _score_p1(s: dict) -> float:
+def _score_p1(s: dict, cfg: dict = None) -> float:
     """정배열 퍼지기 직전 + 매집"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    if s["partial_aligned"]:                               score += 20
-    if s["ma20_just_cross"]:                               score += 15
-    if s["ma60_just_cross"]:                               score += 10
-    if s["bb_squeeze"]:                                    score += 20
-    if s["obv_rising"]:                                    score += 15
-    if s["obv_new_high"]:                                  score += 10
-    if s["bullish_ratio"] >= 0.6:                          score += 10
-    if s["macd_hist"] > s["macd_hist_prev"]:               score += 10
-    if s["rsi"] >= 50:                                     score += 5
-    if 1.2 <= s["vol_ratio"] <= 3.0:                       score += 5
+    if s["partial_aligned"]:                                        score += 20
+    if s["ma20_just_cross"]:                                        score += 15
+    if s["ma60_just_cross"]:                                        score += 10
+    if s["bb_squeeze"]:                                             score += 20
+    if s["obv_rising"]:                                             score += 15
+    if s["obv_new_high"]:                                           score += 10
+    if s["bullish_ratio"] >= 0.6:                                   score += 10
+    if s["macd_hist"] > s["macd_hist_prev"]:                        score += 10
+    if s["rsi"] >= cfg["rsi_min"]:                                  score += 5
+    if cfg["vol_ratio_buy"] * 0.6 <= s["vol_ratio"] <= cfg["vol_ratio_surge"]: score += 5
     return min(score, 100.0)
 
 
-def _score_p2(s: dict) -> float:
+def _score_p2(s: dict, cfg: dict = None) -> float:
     """5일선 타고 올라가는 추세 + 거래량 터짐"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    if s["full_aligned"]:                                  score += 20
-    if s["price_above_ma5"]:                               score += 10
-    if s["ma5_rising"]:                                    score += 10
-    if s["no_ma5_break"]:                                  score += 10
-    if s["macd"] > 0:                                      score += 10
-    if s["macd"] > s["macd_signal"]:                       score += 10
-    if s["macd_hist"] > s["macd_hist_prev"]:               score += 5
-    if 50 <= s["rsi"] <= 70:                               score += 10
-    elif 70 < s["rsi"] <= 80:                              score += 3
-    if s["vol_ratio"] >= 2.0:                              score += 10
-    if s["vol_ratio"] >= 3.0:                              score += 5
-    if s["obv_new_high"]:                                  score += 5
-    if s["momentum_3m"] > 0.1:                            score += 5
+    if s["full_aligned"]:                                           score += 20
+    if s["price_above_ma5"]:                                        score += 10
+    if s["ma5_rising"]:                                             score += 10
+    if s["no_ma5_break"]:                                           score += 10
+    if s["macd"] > 0:                                               score += 10
+    if s["macd"] > s["macd_signal"]:                                score += 10
+    if s["macd_hist"] > s["macd_hist_prev"]:                        score += 5
+    if cfg["rsi_min"] <= s["rsi"] <= cfg["rsi_max"]:                score += 10
+    elif cfg["rsi_max"] < s["rsi"] <= cfg["rsi_overbought"]:        score += 3
+    if s["vol_ratio"] >= cfg["vol_ratio_buy"]:                      score += 10
+    if s["vol_ratio"] >= cfg["vol_ratio_surge"]:                    score += 5
+    if s["obv_new_high"]:                                           score += 5
+    if s["momentum_3m"] > cfg["momentum_min"] * 2:                  score += 5
     return min(score, 100.0)
 
 
-def _score_p3(s: dict) -> float:
+def _score_p3(s: dict, cfg: dict = None) -> float:
     """눌림목"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    if s["is_pullback_range"]:                             score += 25
-    if s["in_fib_zone"]:                                   score += 20
-    if s["above_ma20"]:                                    score += 15
-    if s["today_bullish"]:                                 score += 10
-    if s["partial_aligned"] or s["full_aligned"]:          score += 10
-    if s["macd_hist"] > s["macd_hist_prev"] and s["macd_hist"] < 0:  score += 10
-    if 35 <= s["rsi"] <= 55:                               score += 10
+    if s["is_pullback_range"]:                                      score += 25
+    if s["in_fib_zone"]:                                            score += 20
+    if s["above_ma20"]:                                             score += 15
+    if s["today_bullish"]:                                          score += 10
+    if s["partial_aligned"] or s["full_aligned"]:                   score += 10
+    if s["macd_hist"] > s["macd_hist_prev"] and s["macd_hist"] < 0: score += 10
+    if cfg["rsi_pb_min"] <= s["rsi"] <= cfg["rsi_pb_max"]:          score += 10
     return min(score, 100.0)
 
 
-def _score_canslim(s: dict) -> float:
+def _score_canslim(s: dict, cfg: dict = None) -> float:
     """O'Neil CAN SLIM (기술적 요소 — EPS/기관은 추후)"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    # N: 52주 신고가 25% 이내
-    if s["pos_52w"] >= 0.85:                               score += 25
-    elif s["pos_52w"] >= 0.75:                             score += 15
-    # S: 거래량 급증
-    if s["vol_ratio"] >= 2.0:                              score += 20
-    if s["vol_ratio"] >= 3.0:                              score += 10
-    # L: 시장 대비 아웃퍼폼 (RS)
-    if s["rs"] > 0.05:                                     score += 15
-    if s["rs"] > 0.15:                                     score += 10
-    # 정배열 (M 조건)
-    if s["full_aligned"]:                                  score += 15
-    elif s["partial_aligned"]:                             score += 8
-    # RSI 건강
-    if 50 <= s["rsi"] <= 75:                               score += 5
+    if s["pos_52w"] >= 0.85:                                        score += 25
+    elif s["pos_52w"] >= 0.75:                                      score += 15
+    if s["vol_ratio"] >= cfg["vol_ratio_buy"]:                      score += 20
+    if s["vol_ratio"] >= cfg["vol_ratio_surge"]:                    score += 10
+    if s["rs"] > 0.05:                                              score += 15
+    if s["rs"] > 0.15:                                              score += 10
+    if s["full_aligned"]:                                           score += 15
+    elif s["partial_aligned"]:                                      score += 8
+    if cfg["rsi_min"] <= s["rsi"] <= cfg["rsi_max"] + 5:           score += 5
     return min(score, 100.0)
 
 
-def _score_vcp(s: dict) -> float:
+def _score_vcp(s: dict, cfg: dict = None) -> float:
     """Minervini VCP (변동성 수축 패턴)"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    # 볼린저 수축 (핵심)
-    if s["bb_squeeze"]:                                    score += 30
-    # 조정폭 -10~-30% (VCP 범위)
-    if -0.30 <= s["pullback_pct"] <= -0.10:                score += 20
-    # 거래량 수축 (조용한 조정)
-    if s["vol_contracting"]:                               score += 15
-    # 정배열 유지
-    if s["partial_aligned"]:                               score += 20
-    # OBV 방어 (매도세 없음)
-    if s["obv_rising"]:                                    score += 15
+    if s["bb_squeeze"]:                                             score += 30
+    if cfg["vcp_pullback_min"] <= s["pullback_pct"] <= cfg["vcp_pullback_max"]: score += 20
+    if s["vol_contracting"]:                                        score += 15
+    if s["partial_aligned"]:                                        score += 20
+    if s["obv_rising"]:                                             score += 15
     return min(score, 100.0)
 
 
-def _score_stage2(s: dict) -> float:
+def _score_stage2(s: dict, cfg: dict = None) -> float:
     """Stan Weinstein Stage 2 (상승 추세 진입)"""
     score = 0.0
     # MA120(200) 위 + 우상향 (핵심)
@@ -289,7 +293,7 @@ def _score_stage2(s: dict) -> float:
     return min(score, 100.0)
 
 
-def _score_wyckoff(s: dict) -> float:
+def _score_wyckoff(s: dict, cfg: dict = None) -> float:
     """Wyckoff 매집 (스마트머니 추적)"""
     score = 0.0
     # OBV 신고점 (스마트머니 매집 핵심 증거)
@@ -305,7 +309,7 @@ def _score_wyckoff(s: dict) -> float:
     return min(score, 100.0)
 
 
-def _score_darvas(s: dict) -> float:
+def _score_darvas(s: dict, cfg: dict = None) -> float:
     """Nicolas Darvas Box (박스권 돌파)"""
     score = 0.0
     # 52주 신고가 근처 (박스 상단 돌파 직후)
@@ -360,42 +364,61 @@ EXTRA_COLS = {
 }
 
 
-def run(markets=("KOSPI", "KOSDAQ")) -> dict:
+def run(cfg: dict = None) -> dict:
+    from market_config import KR_CONFIG, CRYPTO_TICKERS
+    if cfg is None:
+        cfg = KR_CONFIG
+
     today      = datetime.today()
-    start_date = _last_weekday(today - timedelta(days=270))  # 52주(252거래일) 확보
+    skip_wknd  = cfg.get("skip_weekends", True)
+    start_date = _last_weekday(today - timedelta(days=270), skip_weekends=skip_wknd)
+    THRESHOLD  = cfg.get("score_threshold", SCORE_THRESHOLD)
 
-    print("시장 수익률(KOSPI) 계산 중...")
-    market_return = _get_market_return(start_date)
-    print(f"KOSPI 3M 수익률: {market_return*100:.1f}%")
+    print(f"\n=== {cfg['name']} 스크리닝 ===")
+    print(f"벤치마크 수익률 계산 중 ({cfg['benchmark']})...")
+    market_return = _get_market_return(start_date, benchmark=cfg["benchmark"])
+    print(f"벤치마크 3M 수익률: {market_return*100:.1f}%")
 
-    frames = []
-    for market in markets:
-        df = fdr.StockListing(market)
-        df["market"] = market
-        frames.append(df)
-
-    df = pd.concat(frames, ignore_index=True)
-    df = df.rename(columns={"Symbol": "ticker", "Code": "ticker", "Name": "name"})
-    df = df.loc[:, ~df.columns.duplicated()]
-    df = df[df["Marcap"] > 100_000_000_000]
-    df = df[df["Close"] > 0]
-
-    # 섹터 컬럼 확보 (있으면 사용, 없으면 빈 문자열)
-    sector_col = next((c for c in df.columns if c.lower() in ("sector", "industry", "dept")), None)
-    if sector_col:
-        df = df.rename(columns={sector_col: "sector"})
+    # ── 종목 리스트 구성 ──────────────────────────────────
+    if cfg["type"] == "CRYPTO":
+        rows = [{"ticker": t, "name": t.split("/")[0], "market": "CRYPTO", "sector": ""}
+                for t in CRYPTO_TICKERS]
     else:
-        df["sector"] = ""
+        frames = []
+        for market in cfg["markets"]:
+            df_mkt = fdr.StockListing(market)
+            df_mkt["market"] = market
+            frames.append(df_mkt)
 
-    print(f"시가총액 필터 후 종목 수: {len(df)}")
+        df = pd.concat(frames, ignore_index=True)
 
-    rows = df[["ticker", "name", "market", "sector"]].to_dict("records")
+        # 티커/이름 컬럼 통일
+        for src, dst in [("Symbol", "ticker"), ("Code", "ticker"), ("Name", "name")]:
+            if src in df.columns and dst not in df.columns:
+                df = df.rename(columns={src: dst})
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # 시총 필터 (KR만)
+        if cfg.get("min_marcap") and "Marcap" in df.columns:
+            df = df[df["Marcap"] > cfg["min_marcap"]]
+        if "Close" in df.columns:
+            df = df[df["Close"] > 0]
+
+        # 섹터
+        sector_col = next((c for c in df.columns if c.lower() in ("sector", "industry", "dept")), None)
+        if sector_col:
+            df = df.rename(columns={sector_col: "sector"})
+        else:
+            df["sector"] = ""
+
+        print(f"종목 수: {len(df)}")
+        rows = df[["ticker", "name", "market", "sector"]].to_dict("records")
 
     def fetch(row):
-        s = _get_signals(row["ticker"], start_date, market_return)
+        s = _get_signals(row["ticker"], start_date, market_return, cfg=cfg)
         if s is None:
             return None
-        scores = {f"score_{k}": fn(s) for k, fn in SCORE_FNS.items()}
+        scores = {f"score_{k}": fn(s, cfg=cfg) for k, fn in SCORE_FNS.items()}
         return {**row, **s, **scores}
 
     results = []
@@ -419,7 +442,7 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
         col = f"score_{key}"
         extra = [c for c in EXTRA_COLS.get(key, []) if c in all_df.columns]
         output[key] = (
-            all_df[all_df[col] >= SCORE_THRESHOLD]
+            all_df[all_df[col] >= THRESHOLD]
             .nlargest(30, col)
             [BASE_COLS + extra + [col]]
             .rename(columns={col: "score"})
@@ -427,7 +450,7 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
 
     # ── 공통 1순위 A: 추세/돌파형 (Stage2 + CAN SLIM + Darvas) 2개+ ──
     trend_hits = sum(
-        (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
+        (all_df[f"score_{k}"] >= THRESHOLD).astype(int)
         for k in TREND_PATTERN_KEYS
     )
     all_df["trend_hits"] = trend_hits
@@ -444,7 +467,7 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
 
     # ── 공통 1순위 B: 매집/수축형 (Wyckoff + VCP) 둘 다 ──────
     accum_hits = sum(
-        (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
+        (all_df[f"score_{k}"] >= THRESHOLD).astype(int)
         for k in ACCUM_PATTERN_KEYS
     )
     all_df["accum_hits"] = accum_hits
@@ -461,7 +484,7 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
 
     # ── 공통 3순위: 내 3개 패턴(P1+P2+P3) 2개+ ──────────────
     custom_hits = sum(
-        (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
+        (all_df[f"score_{k}"] >= THRESHOLD).astype(int)
         for k in CUSTOM_PATTERN_KEYS
     )
     all_df["custom_hits"] = custom_hits

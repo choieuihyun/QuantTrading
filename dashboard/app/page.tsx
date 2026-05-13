@@ -1,5 +1,6 @@
 "use client";
 import useSWR from "swr";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Activity, BarChart2, Star, Zap, Layers, Eye, Box, Trophy } from "lucide-react";
 import { Header } from "@/components/Header";
@@ -7,7 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockTable } from "@/components/StockTable";
 import { fetchLatestResult } from "@/lib/fetcher";
-import type { PatternKey } from "@/lib/types";
+import type { PatternKey, MarketKey, Stock } from "@/lib/types";
+
+const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
+  { key: "kr",     label: "한국",   flag: "🇰🇷" },
+  { key: "us",     label: "미국",   flag: "🇺🇸" },
+  { key: "crypto", label: "코인",   flag: "₿"   },
+];
 
 const PATTERNS: { key: PatternKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
   { key: "common_trend", label: "★ 추세 공통",  desc: "Stage2 + CAN SLIM + Darvas 중 2개+ — 신고가형 상승 추세", icon: Trophy,  color: "text-yellow-400",  bg: "bg-yellow-500/10" },
@@ -38,30 +45,54 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 export default function Home() {
-  const { data, isLoading, mutate } = useSWR("screener", fetchLatestResult, {
+  const { data, isLoading } = useSWR("screener", fetchLatestResult, {
     refreshInterval: 1000 * 60 * 5,
   });
+  const [market, setMarket] = useState<MarketKey>("kr");
 
   const runAt = data?.run_at
     ? new Date(data.run_at.seconds * 1000).toLocaleString("ko-KR")
     : null;
+
+  // 현재 선택된 시장의 패턴 데이터 추출
+  const getPatternData = (patternKey: PatternKey): Stock[] => {
+    const key = `${market}_${patternKey}`;
+    return ((data as Record<string, unknown>)?.[key] as Stock[]) ?? [];
+  };
 
   return (
     <main className="min-h-screen bg-[#080a0f] text-white">
       <Header runAt={runAt ?? undefined} />
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* 마켓 선택 */}
+        <div className="flex gap-2">
+          {MARKETS.map(({ key, label, flag }) => (
+            <button
+              key={key}
+              onClick={() => setMarket(key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                market === key
+                  ? "bg-white/10 border-white/20 text-white"
+                  : "bg-transparent border-white/10 text-white/40 hover:text-white/70"
+              }`}
+            >
+              <span>{flag}</span>{label}
+            </button>
+          ))}
+        </div>
+
         {isLoading ? (
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 bg-white/5 rounded-xl" />)}
           </div>
         ) : data ? (
           <div className="grid grid-cols-5 gap-3">
-            <StatCard label="★ 추세 공통"   value={(data.common_trend as Stock[])?.length ?? 0} color="text-yellow-400" />
-            <StatCard label="★ 매집 공통"   value={(data.common_accum as Stock[])?.length ?? 0} color="text-rose-300" />
-            <StatCard label="CAN SLIM"      value={(data.canslim as Stock[])?.length ?? 0}    color="text-blue-400" />
-            <StatCard label="VCP"           value={(data.vcp as Stock[])?.length ?? 0}        color="text-purple-400" />
-            <StatCard label="Stage 2"       value={(data.stage2 as Stock[])?.length ?? 0}     color="text-cyan-400" />
+            <StatCard label="★ 추세 공통" value={getPatternData("common_trend").length} color="text-yellow-400" />
+            <StatCard label="★ 매집 공통" value={getPatternData("common_accum").length} color="text-rose-300" />
+            <StatCard label="CAN SLIM"    value={getPatternData("canslim").length}       color="text-blue-400" />
+            <StatCard label="VCP"         value={getPatternData("vcp").length}           color="text-purple-400" />
+            <StatCard label="Stage 2"     value={getPatternData("stage2").length}        color="text-cyan-400" />
           </div>
         ) : null}
 
@@ -92,7 +123,7 @@ export default function Home() {
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 bg-white/5 rounded-lg" />)}
                 </div>
               ) : data ? (
-                <StockTable data={data[p.key] ?? []} pattern={p.key} />
+                <StockTable data={getPatternData(p.key)} pattern={p.key} />
               ) : (
                 <div className="py-20 text-center text-white/30">데이터가 없습니다</div>
               )}

@@ -5,6 +5,7 @@ import firebase_upload
 import dart_fetcher
 import backtest
 from datetime import datetime, timedelta
+from market_config import ALL_CONFIGS, KR_CONFIG
 
 PATTERN_NAMES = {
     "p1":         "정배열 퍼지기 직전 + 매집",
@@ -15,51 +16,62 @@ PATTERN_NAMES = {
     "stage2":     "Weinstein Stage 2",
     "wyckoff":    "Wyckoff 매집",
     "darvas":     "Darvas Box 돌파",
-    "common_trend": "★ 추세 공통 (Stage2+CAN SLIM+Darvas)",
-    "common_accum": "★ 매집 공통 (Wyckoff+VCP)",
-    "common_all":   "☆ 내 패턴 공통 (P1+P2+P3)",
+    "common_trend": "★ 추세 공통 (유명 패턴)",
+    "common_accum": "★ 매집 공통 (유명 패턴)",
+    "common_all":   "☆ 내 패턴 공통",
 }
 
 
 def main():
     run_type = sys.argv[1] if len(sys.argv) > 1 else "auto"
-    print(f"Running screener [{run_type}]...\n")
+    print(f"Running screener [{run_type}]...")
 
-    results = screener.run()
+    all_market_results = {}
 
-    # ── DART 펀더멘털 보강 ─────────────────────────────────
-    all_tickers = set()
-    for df in results.values():
-        if hasattr(df, "empty") and not df.empty:
-            all_tickers.update(df["ticker"].tolist())
+    # ── 3개 시장 순차 실행 ─────────────────────────────────
+    for market_key, cfg in ALL_CONFIGS.items():
+        results = screener.run(cfg)
 
-    if all_tickers and os.environ.get("DART_API_KEY"):
-        print(f"\nDART 펀더멘털 수집 중 ({len(all_tickers)}종목)...")
-        dart_data = dart_fetcher.fetch_batch(list(all_tickers))
+        # DART 펀더멘털 보강 (KR만)
+        if market_key == "kr" and os.environ.get("DART_API_KEY"):
+            all_tickers = set()
+            for df in results.values():
+                if hasattr(df, "empty") and not df.empty:
+                    all_tickers.update(df["ticker"].tolist())
+
+            if all_tickers:
+                print(f"\nDART 펀더멘털 수집 중 ({len(all_tickers)}종목)...")
+                dart_data = dart_fetcher.fetch_batch(list(all_tickers))
+                for key, df in results.items():
+                    if hasattr(df, "empty") and not df.empty:
+                        results[key] = df.merge(dart_data, on="ticker", how="left")
+
+        all_market_results[market_key] = results
+
+        # 결과 출력
+        print(f"\n{'='*40}")
         for key, df in results.items():
-            if hasattr(df, "empty") and not df.empty:
-                results[key] = df.merge(dart_data, on="ticker", how="left")
+            name = PATTERN_NAMES.get(key, key)
+            print(f"  [{name}] {len(df)}종목")
+            if not df.empty:
+                cols = ["ticker", "name", "score"]
+                if "eps_yoy" in df.columns:
+                    cols.append("eps_yoy")
+                print("  " + df[cols].head(3).to_string())
 
-    # ── 출력 ───────────────────────────────────────────────
-    print("\n" + "=" * 50)
-    for key, df in results.items():
-        name = PATTERN_NAMES.get(key, key)
-        print(f"\n[{name}] {len(df)}종목")
-        if not df.empty:
-            cols = ["ticker", "name", "score"]
-            if "eps_yoy" in df.columns:
-                cols.append("eps_yoy")
-            if "canslim_c" in df.columns:
-                cols.append("canslim_c")
-            print(df[cols].head(5).to_string())
-
-    # ── 백테스트 ───────────────────────────────────────────
+    # ── 백테스트 (3개 시장 각각) ───────────────────────────
+    all_backtest = {}
     today = datetime.today()
-    bt_start = screener._last_weekday(today - timedelta(days=500))  # 2년치 데이터
-    print("\n백테스트 실행 중...")
-    bt_results = backtest.run(results, bt_start)
 
-    firebase_upload.upload(results, run_type=run_type, backtest=bt_results)
+    for market_key, cfg in ALL_CONFIGS.items():
+        skip_wknd = cfg.get("skip_weekends", True)
+        bt_start = screener._last_weekday(today - timedelta(days=500), skip_weekends=skip_wknd)
+        print(f"\n[{cfg['name']}] 백테스트 실행 중...")
+        bt_results = backtest.run(all_market_results[market_key], bt_start, cfg=cfg)
+        all_backtest[market_key] = bt_results
+
+    # ── Firebase 업로드 ────────────────────────────────────
+    firebase_upload.upload(all_market_results, run_type=run_type, backtest=all_backtest)
     print("\nDone.")
 
 

@@ -25,7 +25,19 @@ def _to_native(val):
     return val
 
 
-def upload(results: dict, run_type: str = "auto", backtest: dict = None):
+def _serialize_df(df) -> list:
+    records = df.to_dict(orient="records")
+    for r in records:
+        for k, v in r.items():
+            r[k] = _to_native(v)
+    return records
+
+
+def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None):
+    """
+    all_market_results: { "kr": {p1: df, ...}, "us": {...}, "crypto": {...} }
+    backtest: { "kr": {common_trend: stats, ...}, "us": {...}, "crypto": {...} }
+    """
     _init_app()
     db = firestore.client()
 
@@ -33,21 +45,24 @@ def upload(results: dict, run_type: str = "auto", backtest: dict = None):
     doc_id = f"{market_date}_{run_type}"
 
     data = {
-        "run_at":     datetime.now(timezone.utc),
+        "run_at":      datetime.now(timezone.utc),
         "market_date": market_date,
-        "run_type":   run_type,
+        "run_type":    run_type,
     }
 
-    for key, df in results.items():
-        records = df.to_dict(orient="records")
-        for r in records:
-            for k, v in r.items():
-                r[k] = _to_native(v)
-        data[key] = records
-        data[f"{key}_count"] = len(records)
+    # 시장별 패턴 데이터 (kr_p1, us_common_trend, crypto_wyckoff 등)
+    for market_key, results in all_market_results.items():
+        for pattern_key, df in results.items():
+            key = f"{market_key}_{pattern_key}"
+            data[key] = _serialize_df(df)
+            data[f"{key}_count"] = len(df)
 
+    # 백테스트 데이터
     if backtest:
         data["backtest"] = backtest
 
     db.collection("screener_results").document(doc_id).set(data)
-    print(f"Uploaded → screener_results/{doc_id}")
+    print(f"\nUploaded → screener_results/{doc_id}")
+    for mk, results in all_market_results.items():
+        counts = {k: len(v) for k, v in results.items() if "common" in k}
+        print(f"  [{mk}] {counts}")
