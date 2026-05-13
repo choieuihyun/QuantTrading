@@ -304,9 +304,10 @@ def _score_darvas(s: dict) -> float:
 # 메인 실행
 # ══════════════════════════════════════════════════════
 
-SCORE_THRESHOLD = 40
+SCORE_THRESHOLD   = 40
 ALL_PATTERN_KEYS  = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
 PRO_PATTERN_KEYS  = ["canslim", "vcp", "stage2", "wyckoff", "darvas"]  # 유명 트레이더만
+CUSTOM_PATTERN_KEYS = ["p1", "p2", "p3"]                               # 내 3개 패턴
 
 SCORE_FNS = {
     "p1":      _score_p1,
@@ -409,21 +410,21 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
         .rename(columns={"pro_hits": "pattern_hits", "pro_score": "score"})
     )
 
-    # ── 공통 3순위: 전체 패턴(8개) 중 3개+ ──────────────────
-    all_hits = sum(
+    # ── 공통 3순위: 내 3개 패턴(P1+P2+P3) 중 2개+ ──────────
+    custom_hits = sum(
         (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
-        for k in ALL_PATTERN_KEYS
+        for k in CUSTOM_PATTERN_KEYS
     )
-    all_df["all_hits"] = all_hits
-    all_df["all_score"] = sum(
-        all_df[f"score_{k}"] for k in ALL_PATTERN_KEYS
-    ) / len(ALL_PATTERN_KEYS)
+    all_df["custom_hits"] = custom_hits
+    all_df["custom_score"] = sum(
+        all_df[f"score_{k}"] for k in CUSTOM_PATTERN_KEYS
+    ) / len(CUSTOM_PATTERN_KEYS)
 
     output["common_all"] = (
-        all_df[all_df["all_hits"] >= 3]
-        .nlargest(20, "all_score")
-        [BASE_COLS + common_extra + ["all_hits", "all_score"]]
-        .rename(columns={"all_hits": "pattern_hits", "all_score": "score"})
+        all_df[all_df["custom_hits"] >= 2]
+        .nlargest(20, "custom_score")
+        [BASE_COLS + common_extra + ["custom_hits", "custom_score"]]
+        .rename(columns={"custom_hits": "pattern_hits", "custom_score": "score"})
     )
 
     for k, v in output.items():
