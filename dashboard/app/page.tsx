@@ -1,38 +1,24 @@
 "use client";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { TrendingUp, Activity, RefreshCw, BarChart2 } from "lucide-react";
+import { TrendingUp, Activity, RefreshCw, BarChart2, Star, Zap, Layers, Eye, Box, Trophy } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockTable } from "@/components/StockTable";
 import { fetchLatestResult } from "@/lib/fetcher";
+import type { PatternKey } from "@/lib/types";
 
-const PATTERNS = [
-  {
-    key: "p1",
-    label: "정배열 + 매집",
-    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",
-    icon: TrendingUp,
-    color: "text-indigo-400",
-    bg: "bg-indigo-500/10",
-  },
-  {
-    key: "p2",
-    label: "5일선 추세",
-    desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",
-    icon: Activity,
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/10",
-  },
-  {
-    key: "p3",
-    label: "눌림목",
-    desc: "피보나치 되돌림 구간 + MACD 반등",
-    icon: BarChart2,
-    color: "text-amber-400",
-    bg: "bg-amber-500/10",
-  },
-] as const;
+const PATTERNS: { key: PatternKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
+  { key: "common",  label: "★ 공통 추출",      desc: "3개 이상 패턴에서 동시 추출된 최우선 종목",            icon: Trophy,    color: "text-yellow-400", bg: "bg-yellow-500/10" },
+  { key: "p1",      label: "정배열 + 매집",    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",           icon: TrendingUp, color: "text-indigo-400", bg: "bg-indigo-500/10" },
+  { key: "p2",      label: "5일선 추세",       desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",              icon: Activity,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  { key: "p3",      label: "눌림목",           desc: "피보나치 되돌림 구간 + MACD 반등",                    icon: BarChart2, color: "text-amber-400",   bg: "bg-amber-500/10" },
+  { key: "canslim", label: "CAN SLIM",         desc: "O'Neil — 52주 신고가 + 거래량 폭발 + 상대강도",       icon: Star,      color: "text-blue-400",    bg: "bg-blue-500/10" },
+  { key: "vcp",     label: "VCP",              desc: "Minervini — 변동성 수축 후 돌파 직전",                icon: Zap,       color: "text-purple-400",  bg: "bg-purple-500/10" },
+  { key: "stage2",  label: "Stage 2",          desc: "Weinstein — MA120 위 + 우상향 안정 추세",             icon: Layers,    color: "text-cyan-400",    bg: "bg-cyan-500/10" },
+  { key: "wyckoff", label: "Wyckoff",          desc: "Wyckoff — OBV 신고점 스마트머니 매집",                icon: Eye,       color: "text-rose-400",    bg: "bg-rose-500/10" },
+  { key: "darvas",  label: "Darvas Box",       desc: "Darvas — 52주 신고가 박스권 돌파 + 거래량 폭발",      icon: Box,       color: "text-orange-400",  bg: "bg-orange-500/10" },
+];
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -79,15 +65,17 @@ export default function Home() {
             {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 bg-white/5 rounded-xl" />)}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard label="정배열 + 매집" value={data.p1_count} color="text-indigo-400" />
-            <StatCard label="5일선 추세"   value={data.p2_count} color="text-emerald-400" />
-            <StatCard label="눌림목"       value={data.p3_count} color="text-amber-400" />
+          <div className="grid grid-cols-5 gap-3">
+            <StatCard label="★ 공통 추출"   value={data.common_count}  color="text-yellow-400" />
+            <StatCard label="CAN SLIM"      value={data.canslim_count} color="text-blue-400" />
+            <StatCard label="VCP"           value={data.vcp_count}     color="text-purple-400" />
+            <StatCard label="Stage 2"       value={data.stage2_count}  color="text-cyan-400" />
+            <StatCard label="Wyckoff"       value={data.wyckoff_count} color="text-rose-400" />
           </div>
         ) : null}
 
-        <Tabs defaultValue="p1">
-          <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
+        <Tabs defaultValue="common">
+          <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl flex-wrap h-auto gap-1">
             {PATTERNS.map((p) => {
               const Icon = p.icon;
               return (
@@ -113,7 +101,7 @@ export default function Home() {
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 bg-white/5 rounded-lg" />)}
                 </div>
               ) : data ? (
-                <StockTable data={data[p.key as "p1" | "p2" | "p3"] ?? []} pattern={p.key as "p1" | "p2" | "p3"} />
+                <StockTable data={data[p.key] ?? []} pattern={p.key} />
               ) : (
                 <div className="py-20 text-center text-white/30">데이터가 없습니다</div>
               )}

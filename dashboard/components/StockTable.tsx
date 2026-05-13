@@ -10,21 +10,35 @@ import { ScoreBar } from "./ScoreBar";
 import { StockDetailModal } from "./StockDetailModal";
 import type { Stock } from "@/lib/types";
 
+import type { PatternKey } from "@/lib/types";
+
 interface Props {
   data: Stock[];
-  pattern: "p1" | "p2" | "p3";
+  pattern: PatternKey;
 }
 
 const PATTERN_COLS: Record<string, (keyof Stock)[]> = {
-  p1: ["bb_squeeze", "obv_rising", "bullish_ratio"],
-  p2: ["full_aligned", "no_ma5_break"],
-  p3: ["pullback_pct", "in_fib_zone", "today_bullish"],
+  p1:      ["bb_squeeze", "obv_rising", "bullish_ratio"],
+  p2:      ["full_aligned", "no_ma5_break"],
+  p3:      ["pullback_pct", "in_fib_zone", "today_bullish"],
+  canslim: ["near_52w_high", "pos_52w", "rs"],
+  vcp:     ["bb_squeeze", "vol_contracting", "pullback_pct"],
+  stage2:  ["ma120_rising", "above_ma120_days", "rs"],
+  wyckoff: ["obv_new_high", "obv_rising", "bullish_ratio"],
+  darvas:  ["pos_52w", "near_52w_high"],
+  common:  ["pattern_hits", "pos_52w", "rs"],
 };
 
 const PATTERN_LABELS: Record<string, Record<string, string>> = {
-  p1: { bb_squeeze: "BB수축", obv_rising: "OBV↑", bullish_ratio: "양봉률" },
-  p2: { full_aligned: "정배열", no_ma5_break: "5선유지" },
-  p3: { pullback_pct: "조정폭", in_fib_zone: "피보", today_bullish: "오늘양봉" },
+  p1:      { bb_squeeze: "BB수축", obv_rising: "OBV↑", bullish_ratio: "양봉률" },
+  p2:      { full_aligned: "정배열", no_ma5_break: "5선유지" },
+  p3:      { pullback_pct: "조정폭", in_fib_zone: "피보", today_bullish: "오늘양봉" },
+  canslim: { near_52w_high: "신고가근처", pos_52w: "52주위치", rs: "상대강도" },
+  vcp:     { bb_squeeze: "BB수축", vol_contracting: "거래량수축", pullback_pct: "조정폭" },
+  stage2:  { ma120_rising: "MA120↑", above_ma120_days: "유지일수", rs: "상대강도" },
+  wyckoff: { obv_new_high: "OBV신고점", obv_rising: "OBV↑", bullish_ratio: "양봉률" },
+  darvas:  { pos_52w: "52주위치", near_52w_high: "신고가근처" },
+  common:  { pattern_hits: "적중패턴수", pos_52w: "52주위치", rs: "상대강도" },
 };
 
 function formatExtra(key: string, val: unknown): string {
