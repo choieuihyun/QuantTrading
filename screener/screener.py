@@ -1,6 +1,7 @@
 import pandas as pd
 import FinanceDataReader as fdr
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def _last_weekday(dt: datetime) -> str:
@@ -50,19 +51,23 @@ def run(markets=("KOSPI", "KOSDAQ")) -> pd.DataFrame:
     df = df[df["Close"] > 0]
     print(f"시가총액 필터 후 종목 수: {len(df)}")
 
-    results = []
-    for _, row in df.iterrows():
+    rows = df[["ticker", "name", "market"]].to_dict("records")
+
+    def fetch(row):
         signals = _get_signals(row["ticker"], date_3m)
         if signals is None:
-            continue
-        results.append({
-            "ticker": row["ticker"],
-            "name": row["name"],
-            "market": row["market"],
-            "price": signals["price"],
-            "momentum_3m": signals["momentum_3m"],
-            "vol_ratio": signals["vol_ratio"],
-        })
+            return None
+        return {**row, "price": signals["price"], "momentum_3m": signals["momentum_3m"], "vol_ratio": signals["vol_ratio"]}
+
+    results = []
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = {executor.submit(fetch, row): row for row in rows}
+        for i, future in enumerate(as_completed(futures), 1):
+            result = future.result()
+            if result:
+                results.append(result)
+            if i % 50 == 0:
+                print(f"진행: {i}/{len(rows)}")
 
     if not results:
         return pd.DataFrame()
