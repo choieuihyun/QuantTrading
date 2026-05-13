@@ -19,7 +19,7 @@ def _init_app():
 
 def upload(df, run_type: str = "auto"):
     _init_app()
-    db = firestore.client(database_id="quanttrading")
+    db = firestore.client()
 
     market_date = datetime.today().strftime("%Y-%m-%d")
     doc_id = f"{market_date}_{run_type}"
