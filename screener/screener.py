@@ -305,7 +305,8 @@ def _score_darvas(s: dict) -> float:
 # ══════════════════════════════════════════════════════
 
 SCORE_THRESHOLD = 40
-ALL_PATTERN_KEYS = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
+ALL_PATTERN_KEYS  = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
+PRO_PATTERN_KEYS  = ["canslim", "vcp", "stage2", "wyckoff", "darvas"]  # 유명 트레이더만
 
 SCORE_FNS = {
     "p1":      _score_p1,
@@ -375,7 +376,7 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
                 print(f"진행: {i}/{len(rows)}")
 
     if not results:
-        return {k: [] for k in ALL_PATTERN_KEYS + ["common"]}
+        return {k: [] for k in ALL_PATTERN_KEYS + ["common_pro", "common_all"]}
 
     all_df = pd.DataFrame(results)
 
@@ -390,22 +391,39 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
             .rename(columns={col: "score"})
         )
 
-    # 공통: 3개+ 패턴에서 threshold 이상인 종목
-    hit_counts = sum(
+    # ── 공통 1순위: 유명 패턴(5개) 중 3개+ ──────────────────
+    pro_hits = sum(
+        (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
+        for k in PRO_PATTERN_KEYS
+    )
+    all_df["pro_hits"] = pro_hits
+    all_df["pro_score"] = sum(
+        all_df[f"score_{k}"] for k in PRO_PATTERN_KEYS
+    ) / len(PRO_PATTERN_KEYS)
+
+    common_extra = [c for c in EXTRA_COLS["common"] if c in all_df.columns]
+    output["common_pro"] = (
+        all_df[all_df["pro_hits"] >= 3]
+        .nlargest(20, "pro_score")
+        [BASE_COLS + common_extra + ["pro_hits", "pro_score"]]
+        .rename(columns={"pro_hits": "pattern_hits", "pro_score": "score"})
+    )
+
+    # ── 공통 3순위: 전체 패턴(8개) 중 3개+ ──────────────────
+    all_hits = sum(
         (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
         for k in ALL_PATTERN_KEYS
     )
-    all_df["pattern_hits"] = hit_counts
-    all_df["common_score"] = sum(
+    all_df["all_hits"] = all_hits
+    all_df["all_score"] = sum(
         all_df[f"score_{k}"] for k in ALL_PATTERN_KEYS
     ) / len(ALL_PATTERN_KEYS)
 
-    common_extra = [c for c in EXTRA_COLS["common"] if c in all_df.columns]
-    output["common"] = (
-        all_df[all_df["pattern_hits"] >= 3]
-        .nlargest(20, "common_score")
-        [BASE_COLS + common_extra + ["pattern_hits", "common_score"]]
-        .rename(columns={"common_score": "score"})
+    output["common_all"] = (
+        all_df[all_df["all_hits"] >= 3]
+        .nlargest(20, "all_score")
+        [BASE_COLS + common_extra + ["all_hits", "all_score"]]
+        .rename(columns={"all_hits": "pattern_hits", "all_score": "score"})
     )
 
     for k, v in output.items():

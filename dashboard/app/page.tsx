@@ -9,7 +9,8 @@ import { fetchLatestResult } from "@/lib/fetcher";
 import type { PatternKey } from "@/lib/types";
 
 const PATTERNS: { key: PatternKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { key: "common",  label: "★ 공통 추출",      desc: "3개 이상 패턴에서 동시 추출된 최우선 종목",            icon: Trophy,    color: "text-yellow-400", bg: "bg-yellow-500/10" },
+  { key: "common_pro", label: "★ 공통 1순위",  desc: "유명 트레이더 패턴(5개) 중 3개+ 동시 해당 — 최고 신뢰도", icon: Trophy,    color: "text-yellow-400", bg: "bg-yellow-500/10" },
+  { key: "common_all", label: "☆ 공통 3순위",  desc: "전체 패턴(8개) 중 3개+ 동시 해당 — 참고용",           icon: Star,      color: "text-white/50",   bg: "bg-white/5" },
   { key: "p1",      label: "정배열 + 매집",    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",           icon: TrendingUp, color: "text-indigo-400", bg: "bg-indigo-500/10" },
   { key: "p2",      label: "5일선 추세",       desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",              icon: Activity,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
   { key: "p3",      label: "눌림목",           desc: "피보나치 되돌림 구간 + MACD 반등",                    icon: BarChart2, color: "text-amber-400",   bg: "bg-amber-500/10" },
@@ -66,15 +67,15 @@ export default function Home() {
           </div>
         ) : data ? (
           <div className="grid grid-cols-5 gap-3">
-            <StatCard label="★ 공통 추출"   value={data.common_count}  color="text-yellow-400" />
-            <StatCard label="CAN SLIM"      value={data.canslim_count} color="text-blue-400" />
-            <StatCard label="VCP"           value={data.vcp_count}     color="text-purple-400" />
-            <StatCard label="Stage 2"       value={data.stage2_count}  color="text-cyan-400" />
-            <StatCard label="Wyckoff"       value={data.wyckoff_count} color="text-rose-400" />
+            <StatCard label="★ 공통 1순위"  value={(data.common_pro as Stock[])?.length ?? 0} color="text-yellow-400" />
+            <StatCard label="☆ 공통 3순위"  value={(data.common_all as Stock[])?.length ?? 0} color="text-white/50" />
+            <StatCard label="CAN SLIM"      value={(data.canslim as Stock[])?.length ?? 0}    color="text-blue-400" />
+            <StatCard label="VCP"           value={(data.vcp as Stock[])?.length ?? 0}        color="text-purple-400" />
+            <StatCard label="Stage 2"       value={(data.stage2 as Stock[])?.length ?? 0}     color="text-cyan-400" />
           </div>
         ) : null}
 
-        <Tabs defaultValue="common">
+        <Tabs defaultValue="common_pro">
           <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl flex-wrap h-auto gap-1">
             {PATTERNS.map((p) => {
               const Icon = p.icon;

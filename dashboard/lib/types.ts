@@ -40,7 +40,7 @@ export interface Stock {
   pattern_hits?: number;
 }
 
-export type PatternKey = "p1" | "p2" | "p3" | "canslim" | "vcp" | "stage2" | "wyckoff" | "darvas" | "common";
+export type PatternKey = "p1" | "p2" | "p3" | "canslim" | "vcp" | "stage2" | "wyckoff" | "darvas" | "common_pro" | "common_all";
 
 export interface ScreenerResult {
   run_at: { seconds: number };
@@ -54,14 +54,7 @@ export interface ScreenerResult {
   stage2: Stock[];
   wyckoff: Stock[];
   darvas: Stock[];
-  common: Stock[];
-  p1_count: number;
-  p2_count: number;
-  p3_count: number;
-  canslim_count: number;
-  vcp_count: number;
-  stage2_count: number;
-  wyckoff_count: number;
-  darvas_count: number;
-  common_count: number;
+  common_pro: Stock[];
+  common_all: Stock[];
+  [key: string]: Stock[] | unknown;
 }

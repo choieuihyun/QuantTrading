@@ -26,7 +26,8 @@ const PATTERN_COLS: Record<string, (keyof Stock)[]> = {
   stage2:  ["ma120_rising", "above_ma120_days", "rs"],
   wyckoff: ["obv_new_high", "obv_rising", "bullish_ratio"],
   darvas:  ["pos_52w", "near_52w_high"],
-  common:  ["pattern_hits", "pos_52w", "rs"],
+  common_pro: ["pattern_hits", "pos_52w", "rs"],
+  common_all: ["pattern_hits", "pos_52w", "rs"],
 };
 
 const PATTERN_LABELS: Record<string, Record<string, string>> = {
@@ -38,7 +39,8 @@ const PATTERN_LABELS: Record<string, Record<string, string>> = {
   stage2:  { ma120_rising: "MA120↑", above_ma120_days: "유지일수", rs: "상대강도" },
   wyckoff: { obv_new_high: "OBV신고점", obv_rising: "OBV↑", bullish_ratio: "양봉률" },
   darvas:  { pos_52w: "52주위치", near_52w_high: "신고가근처" },
-  common:  { pattern_hits: "적중패턴수", pos_52w: "52주위치", rs: "상대강도" },
+  common_pro: { pattern_hits: "적중패턴수", pos_52w: "52주위치", rs: "상대강도" },
+  common_all: { pattern_hits: "적중패턴수", pos_52w: "52주위치", rs: "상대강도" },
 };
 
 function formatExtra(key: string, val: unknown): string {
