@@ -13,8 +13,9 @@ PATTERN_NAMES = {
     "stage2":     "Weinstein Stage 2",
     "wyckoff":    "Wyckoff 매집",
     "darvas":     "Darvas Box 돌파",
-    "common_pro": "★ 공통 1순위 (유명 패턴)",
-    "common_all": "☆ 공통 3순위 (내 패턴)",
+    "common_trend": "★ 추세 공통 (Stage2+CAN SLIM+Darvas)",
+    "common_accum": "★ 매집 공통 (Wyckoff+VCP)",
+    "common_all":   "☆ 내 패턴 공통 (P1+P2+P3)",
 }
 
 

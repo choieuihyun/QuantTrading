@@ -317,10 +317,11 @@ def _score_darvas(s: dict) -> float:
 # 메인 실행
 # ══════════════════════════════════════════════════════
 
-SCORE_THRESHOLD   = 40
-ALL_PATTERN_KEYS  = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
-PRO_PATTERN_KEYS  = ["canslim", "vcp", "stage2", "wyckoff", "darvas"]  # 유명 트레이더만
-CUSTOM_PATTERN_KEYS = ["p1", "p2", "p3"]                               # 내 3개 패턴
+SCORE_THRESHOLD     = 40
+ALL_PATTERN_KEYS    = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
+TREND_PATTERN_KEYS  = ["stage2", "canslim", "darvas"]   # 추세/돌파형 (신고가, 상승 추세)
+ACCUM_PATTERN_KEYS  = ["wyckoff", "vcp"]                # 매집/수축형 (조정, 매집 완료)
+CUSTOM_PATTERN_KEYS = ["p1", "p2", "p3"]                # 내 3개 패턴
 
 SCORE_FNS = {
     "p1":      _score_p1,
@@ -345,7 +346,9 @@ EXTRA_COLS = {
     "stage2":  ["ma120_rising", "above_ma120_days", "rs"],
     "wyckoff": ["obv_new_high", "obv_rising", "bb_squeeze", "bullish_ratio"],
     "darvas":  ["pos_52w", "near_52w_high", "momentum_3m"],
-    "common":  ["pos_52w", "rs", "full_aligned", "obv_rising"],
+    "common_trend": ["pos_52w", "rs", "near_52w_high", "full_aligned"],
+    "common_accum": ["bb_squeeze", "obv_rising", "obv_new_high", "vol_contracting"],
+    "common_all":   ["pos_52w", "rs", "full_aligned", "obv_rising"],
 }
 
 
@@ -398,9 +401,10 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
                 print(f"진행: {i}/{len(rows)}")
 
     if not results:
-        return {k: [] for k in ALL_PATTERN_KEYS + ["common_pro", "common_all"]}
+        return {k: [] for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
 
     all_df = pd.DataFrame(results)
+    common_extra = [c for c in EXTRA_COLS.get("common_trend", []) if c in all_df.columns]
 
     output = {}
     for key in ALL_PATTERN_KEYS:
@@ -413,25 +417,41 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
             .rename(columns={col: "score"})
         )
 
-    # ── 공통 1순위: 유명 패턴(5개) 중 3개+ ──────────────────
-    pro_hits = sum(
+    # ── 공통 1순위 A: 추세/돌파형 (Stage2 + CAN SLIM + Darvas) 2개+ ──
+    trend_hits = sum(
         (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
-        for k in PRO_PATTERN_KEYS
+        for k in TREND_PATTERN_KEYS
     )
-    all_df["pro_hits"] = pro_hits
-    all_df["pro_score"] = sum(
-        all_df[f"score_{k}"] for k in PRO_PATTERN_KEYS
-    ) / len(PRO_PATTERN_KEYS)
+    all_df["trend_hits"] = trend_hits
+    all_df["trend_score"] = sum(
+        all_df[f"score_{k}"] for k in TREND_PATTERN_KEYS
+    ) / len(TREND_PATTERN_KEYS)
 
-    common_extra = [c for c in EXTRA_COLS["common"] if c in all_df.columns]
-    output["common_pro"] = (
-        all_df[all_df["pro_hits"] >= 3]
-        .nlargest(20, "pro_score")
-        [BASE_COLS + common_extra + ["pro_hits", "pro_score"]]
-        .rename(columns={"pro_hits": "pattern_hits", "pro_score": "score"})
+    output["common_trend"] = (
+        all_df[all_df["trend_hits"] >= 2]
+        .nlargest(20, "trend_score")
+        [BASE_COLS + common_extra + ["trend_hits", "trend_score"]]
+        .rename(columns={"trend_hits": "pattern_hits", "trend_score": "score"})
     )
 
-    # ── 공통 3순위: 내 3개 패턴(P1+P2+P3) 중 2개+ ──────────
+    # ── 공통 1순위 B: 매집/수축형 (Wyckoff + VCP) 둘 다 ──────
+    accum_hits = sum(
+        (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
+        for k in ACCUM_PATTERN_KEYS
+    )
+    all_df["accum_hits"] = accum_hits
+    all_df["accum_score"] = sum(
+        all_df[f"score_{k}"] for k in ACCUM_PATTERN_KEYS
+    ) / len(ACCUM_PATTERN_KEYS)
+
+    output["common_accum"] = (
+        all_df[all_df["accum_hits"] >= 2]
+        .nlargest(20, "accum_score")
+        [BASE_COLS + common_extra + ["accum_hits", "accum_score"]]
+        .rename(columns={"accum_hits": "pattern_hits", "accum_score": "score"})
+    )
+
+    # ── 공통 3순위: 내 3개 패턴(P1+P2+P3) 2개+ ──────────────
     custom_hits = sum(
         (all_df[f"score_{k}"] >= SCORE_THRESHOLD).astype(int)
         for k in CUSTOM_PATTERN_KEYS
