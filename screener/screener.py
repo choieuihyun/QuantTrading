@@ -122,6 +122,16 @@ def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | N
         # ── Stage 2 유지 기간 (MA120 위 거래일 수) ───────────
         above_ma120_days = int((close.iloc[-20:].values > ma120.iloc[-20:].values).sum())
 
+        # ── ATR (14일) + 손절가 ───────────────────────────────
+        tr = pd.concat([
+            high - low,
+            (high - close.shift(1)).abs(),
+            (low  - close.shift(1)).abs(),
+        ], axis=1).max(axis=1)
+        atr_14     = round(float(tr.rolling(14).mean().iloc[-1]), 0)
+        stop_swing = round(price_now - 1.5 * atr_14, 0)   # 스윙 손절 (-1.5 ATR)
+        stop_lt    = round(price_now - 2.5 * atr_14, 0)   # 장투 손절 (-2.5 ATR)
+
         return {
             "price":              price_now,
             "ma5":                round(ma5_v, 0),
@@ -157,6 +167,9 @@ def _get_signals(ticker: str, start_date: str, market_return: float) -> dict | N
             "today_bullish":      bool(today_bullish),
             "bullish_ratio":      round(bullish_ratio, 2),
             "above_ma120_days":   above_ma120_days,
+            "atr_14":             atr_14,
+            "stop_swing":         stop_swing,
+            "stop_lt":            stop_lt,
         }
     except Exception:
         return None
@@ -320,8 +333,8 @@ SCORE_FNS = {
     "darvas":  _score_darvas,
 }
 
-BASE_COLS = ["ticker", "name", "market", "price", "ma5", "ma20", "ma60", "ma120",
-             "rsi", "macd", "vol_ratio", "momentum_3m", "rs", "pos_52w"]
+BASE_COLS = ["ticker", "name", "market", "sector", "price", "ma5", "ma20", "ma60", "ma120",
+             "rsi", "macd", "vol_ratio", "momentum_3m", "rs", "pos_52w", "atr_14", "stop_swing", "stop_lt"]
 
 EXTRA_COLS = {
     "p1":      ["bb_squeeze", "obv_rising", "obv_new_high", "bullish_ratio", "ma20_just_cross"],
@@ -338,7 +351,7 @@ EXTRA_COLS = {
 
 def run(markets=("KOSPI", "KOSDAQ")) -> dict:
     today      = datetime.today()
-    start_date = _last_weekday(today - timedelta(days=200))
+    start_date = _last_weekday(today - timedelta(days=270))  # 52주(252거래일) 확보
 
     print("시장 수익률(KOSPI) 계산 중...")
     market_return = _get_market_return(start_date)
@@ -355,9 +368,17 @@ def run(markets=("KOSPI", "KOSDAQ")) -> dict:
     df = df.loc[:, ~df.columns.duplicated()]
     df = df[df["Marcap"] > 100_000_000_000]
     df = df[df["Close"] > 0]
+
+    # 섹터 컬럼 확보 (있으면 사용, 없으면 빈 문자열)
+    sector_col = next((c for c in df.columns if c.lower() in ("sector", "industry", "dept")), None)
+    if sector_col:
+        df = df.rename(columns={sector_col: "sector"})
+    else:
+        df["sector"] = ""
+
     print(f"시가총액 필터 후 종목 수: {len(df)}")
 
-    rows = df[["ticker", "name", "market"]].to_dict("records")
+    rows = df[["ticker", "name", "market", "sector"]].to_dict("records")
 
     def fetch(row):
         s = _get_signals(row["ticker"], start_date, market_return)

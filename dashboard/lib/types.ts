@@ -2,7 +2,11 @@ export interface Stock {
   ticker: string;
   name: string;
   market: string;
+  sector?: string;
   price: number;
+  atr_14?: number;
+  stop_swing?: number;
+  stop_lt?: number;
   ma5: number;
   ma20: number;
   ma60: number;
