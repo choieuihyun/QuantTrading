@@ -45,6 +45,12 @@ const PATTERN_LABELS: Record<string, Record<string, string>> = {
   common_all:   { pattern_hits: "적중패턴수", pos_52w: "52주위치", rs: "상대강도" },
 };
 
+function formatTradingValue(v: number | undefined, market: string): string {
+  if (!v) return "-";
+  if (market === "KOSPI" || market === "KOSDAQ") return `${(v / 1e8).toFixed(0)}억`;
+  return `$${(v / 1e6).toFixed(1)}M`;
+}
+
 function formatExtra(key: string, val: unknown): string {
   if (val === undefined || val === null) return "-";
   if (typeof val === "boolean") return val ? "✓" : "✗";
@@ -94,6 +100,15 @@ export function StockTable({ data, pattern }: Props) {
         const v = getValue() as number;
         return <span className={`font-mono text-sm ${v >= 2 ? "text-emerald-400" : "text-white/60"}`}>{v.toFixed(1)}x</span>;
       },
+    },
+    {
+      accessorKey: "avg_value_20",
+      header: "거래대금",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-white/60">
+          {formatTradingValue(row.original.avg_value_20, row.original.market)}
+        </span>
+      ),
     },
     {
       accessorKey: "momentum_3m",

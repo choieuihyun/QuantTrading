@@ -14,6 +14,7 @@ export interface Stock {
   rsi: number;
   macd: number;
   vol_ratio: number;
+  avg_value_20?: number;
   momentum_3m: number;
   rs?: number;
   pos_52w?: number;

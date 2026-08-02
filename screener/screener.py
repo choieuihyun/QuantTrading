@@ -1,7 +1,9 @@
 import pandas as pd
 import FinanceDataReader as fdr
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+MIN_BARS = 150   # ma120.iloc[-20] 계산에 최소 140봉 필요
 
 
 def _last_weekday(dt: datetime, skip_weekends: bool = True) -> str:
@@ -19,25 +21,33 @@ def _calc_rsi(close: pd.Series, period=14) -> float:
     return float((100 - 100 / (1 + rs)).iloc[-1])
 
 
-def _get_market_return(start_date: str, benchmark: str = "KS11") -> float:
-    try:
-        data = fdr.DataReader(benchmark, start_date)
-        if data.empty or len(data) < 2:
-            return 0.0
-        ref = float(data["Close"].iloc[-65]) if len(data) >= 65 else float(data["Close"].iloc[0])
-        now = float(data["Close"].iloc[-1])
-        return round((now - ref) / ref, 4)
-    except Exception:
-        return 0.0
+def drop_partial_bar(hist: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """24/7 시장은 진행 중인 당일 봉의 거래량이 미완성이라 vol_ratio가 왜곡됨"""
+    if not cfg.get("drop_partial_bar") or hist.empty:
+        return hist
+    today_utc = datetime.now(timezone.utc).date()
+    if hist.index[-1].date() >= today_utc:
+        return hist.iloc[:-1]
+    return hist
+
+
+def _get_market_return(start_date: str, benchmark: str = "KS11", bars: int = 65) -> float:
+    """실패 시 예외로 중단 — 조용히 0.0을 반환하면 rs가 절대 모멘텀으로 바뀜"""
+    data = fdr.DataReader(benchmark, start_date)
+    if data.empty or len(data) < bars + 1:
+        raise RuntimeError(f"벤치마크 {benchmark} 데이터 부족 ({len(data)}행, {bars + 1}행 필요)")
+    ref = float(data["Close"].iloc[-bars])
+    now = float(data["Close"].iloc[-1])
+    return round((now - ref) / ref, 4)
 
 
 def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: dict = None) -> dict | None:
+    """DataFrame을 직접 받아 신호 계산 (백테스트에서도 재사용)"""
     from market_config import KR_CONFIG
     if cfg is None:
         cfg = KR_CONFIG
-    """DataFrame을 직접 받아 신호 계산 (백테스트에서도 재사용)"""
     try:
-        if hist.empty or len(hist) < 120:
+        if hist.empty or len(hist) < MIN_BARS:
             return None
 
         close  = hist["Close"]
@@ -49,6 +59,13 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         price_now = float(close.iloc[-1])
         if price_now <= 0:
             return None
+
+        # ── 거래 가능성 (거래정지·가격고정 종목 배제) ────────
+        recent_vol   = volume.iloc[-20:]
+        zero_vol_days = int((recent_vol.fillna(0) <= 0).sum())
+        price_frozen  = float(close.iloc[-20:].std()) == 0.0
+        avg_value_20  = float((close * volume).iloc[-20:].mean())
+        is_tradable   = (zero_vol_days <= 2) and not price_frozen
 
         # ── 이동평균 ─────────────────────────────────────────
         ma5   = close.rolling(5).mean()
@@ -91,15 +108,19 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         no_ma5_break    = bool((close.iloc[-5:] >= ma5.iloc[-5:] * 0.99).all())
 
         # ── 3개월 모멘텀 + 상대강도(RS) ─────────────────────
-        ref = float(close.iloc[-65]) if len(hist) >= 65 else float(close.iloc[0])
+        ref = float(close.iloc[-65])
         momentum_3m = round((price_now - ref) / ref, 4)
         rs = round(momentum_3m - market_return, 4)
 
-        # ── 52주(데이터 기간) 고/저점 위치 ───────────────────
-        high_period = float(high.max())
-        low_period  = float(low.min())
+        # ── 52주 고/저점 위치 ────────────────────────────────
+        # 시장별 연간 봉 수 기준 (주식 252, 코인 365)
+        year_bars   = cfg.get("bars_per_year", 252)
+        win         = min(year_bars, len(hist))
+        high_period = float(high.iloc[-win:].max())
+        low_period  = float(low.iloc[-win:].min())
         pos_52w = round((price_now - low_period) / (high_period - low_period), 4) if (high_period - low_period) > 0 else 0.5
         near_52w_high = pos_52w >= 0.75
+        pos_52w_full  = len(hist) >= year_bars
 
         # ── 정배열 ────────────────────────────────────────────
         full_aligned    = ma5_v > ma20_v > ma60_v > ma120_v
@@ -112,7 +133,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         # ── 눌림목 ───────────────────────────────────────────
         recent_high       = float(close.iloc[-25:-3].max())
         pullback_pct      = (price_now - recent_high) / recent_high
-        prior_low         = float(close.iloc[-85:-25].min()) if len(hist) >= 85 else float(close.iloc[0])
+        prior_low         = float(close.iloc[-85:-25].min())
         fib_38            = recent_high - (recent_high - prior_low) * 0.382
         fib_62            = recent_high - (recent_high - prior_low) * 0.618
         in_fib_zone       = bool(fib_62 <= price_now <= fib_38)
@@ -132,16 +153,18 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             (high - close.shift(1)).abs(),
             (low  - close.shift(1)).abs(),
         ], axis=1).max(axis=1)
-        atr_14     = round(float(tr.rolling(14).mean().iloc[-1]), 0)
-        stop_swing = round(price_now - 1.5 * atr_14, 0)   # 스윙 손절 (-1.5 ATR)
-        stop_lt    = round(price_now - 2.5 * atr_14, 0)   # 장투 손절 (-2.5 ATR)
+        atr_14 = float(tr.rolling(14).mean().iloc[-1])
+        # 가격 스케일이 시장마다 달라 반올림 자리수를 가격에 맞춤
+        nd = 0 if price_now >= 1000 else 4
+        stop_swing = round(price_now - 1.5 * atr_14, nd)   # 스윙 손절 (-1.5 ATR)
+        stop_lt    = round(price_now - 2.5 * atr_14, nd)   # 장투 손절 (-2.5 ATR)
 
         return {
             "price":              price_now,
-            "ma5":                round(ma5_v, 0),
-            "ma20":               round(ma20_v, 0),
-            "ma60":               round(ma60_v, 0),
-            "ma120":              round(ma120_v, 0),
+            "ma5":                round(ma5_v, nd),
+            "ma20":               round(ma20_v, nd),
+            "ma60":               round(ma60_v, nd),
+            "ma120":              round(ma120_v, nd),
             "ma120_rising":       bool(ma120_rising),
             "macd":               round(float(macd_line.iloc[-1]), 4),
             "macd_signal":        round(float(signal_line.iloc[-1]), 4),
@@ -153,6 +176,8 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             "obv_new_high":       bool(obv_new_high),
             "vol_ratio":          vol_ratio,
             "vol_contracting":    bool(vol_contracting),
+            "avg_value_20":       round(avg_value_20, 0),
+            "is_tradable":        bool(is_tradable),
             "price_above_ma5":    bool(price_above_ma5),
             "ma5_rising":         bool(ma5_rising),
             "no_ma5_break":       bool(no_ma5_break),
@@ -160,6 +185,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             "rs":                 rs,
             "pos_52w":            pos_52w,
             "near_52w_high":      bool(near_52w_high),
+            "pos_52w_full":       bool(pos_52w_full),
             "full_aligned":       bool(full_aligned),
             "partial_aligned":    bool(partial_aligned),
             "ma20_just_cross":    bool(ma20_just_cross),
@@ -171,7 +197,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             "today_bullish":      bool(today_bullish),
             "bullish_ratio":      round(bullish_ratio, 2),
             "above_ma120_days":   above_ma120_days,
-            "atr_14":             atr_14,
+            "atr_14":             round(atr_14, nd),
             "stop_swing":         stop_swing,
             "stop_lt":            stop_lt,
         }
@@ -182,6 +208,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
 def _get_signals(ticker: str, start_date: str, market_return: float, cfg: dict = None) -> dict | None:
     try:
         hist = fdr.DataReader(ticker, start_date)
+        hist = drop_partial_bar(hist, cfg or {})
         return calc_signals_from_df(hist, market_return, cfg=cfg)
     except Exception:
         return None
@@ -278,16 +305,12 @@ def _score_vcp(s: dict, cfg: dict = None) -> float:
 def _score_stage2(s: dict, cfg: dict = None) -> float:
     """Stan Weinstein Stage 2 (상승 추세 진입)"""
     score = 0.0
-    # MA120(200) 위 + 우상향 (핵심)
     if s["price"] > s["ma120"]:                            score += 25
     if s["ma120_rising"]:                                  score += 25
-    # MA120 위 유지 기간 (안정적 Stage 2)
     if s["above_ma120_days"] >= 15:                        score += 15
     elif s["above_ma120_days"] >= 8:                       score += 8
-    # 정배열
     if s["partial_aligned"]:                               score += 15
     if s["full_aligned"]:                                  score += 5
-    # 시장 대비 아웃퍼폼
     if s["rs"] > 0:                                        score += 10
     if s["rs"] > 0.05:                                     score += 5
     return min(score, 100.0)
@@ -296,14 +319,10 @@ def _score_stage2(s: dict, cfg: dict = None) -> float:
 def _score_wyckoff(s: dict, cfg: dict = None) -> float:
     """Wyckoff 매집 (스마트머니 추적)"""
     score = 0.0
-    # OBV 신고점 (스마트머니 매집 핵심 증거)
     if s["obv_new_high"]:                                  score += 35
     elif s["obv_rising"]:                                  score += 20
-    # Spring 후 수축 (볼린저 수축)
     if s["bb_squeeze"]:                                    score += 20
-    # 양봉 비율 (매수 압력)
     if s["bullish_ratio"] >= 0.65:                         score += 20
-    # MA 위 위치
     if s["price"] > s["ma20"]:                             score += 15
     if s["price"] > s["ma60"]:                             score += 10
     return min(score, 100.0)
@@ -311,25 +330,52 @@ def _score_wyckoff(s: dict, cfg: dict = None) -> float:
 
 def _score_darvas(s: dict, cfg: dict = None) -> float:
     """Nicolas Darvas Box (박스권 돌파)"""
+    from market_config import KR_CONFIG
+    if cfg is None: cfg = KR_CONFIG
     score = 0.0
-    # 52주 신고가 근처 (박스 상단 돌파 직후)
     if s["pos_52w"] >= 0.90:                               score += 35
     elif s["pos_52w"] >= 0.80:                             score += 20
     elif s["pos_52w"] >= 0.70:                             score += 10
-    # 거래량 폭발
-    if s["vol_ratio"] >= 2.0:                              score += 25
-    if s["vol_ratio"] >= 3.0:                              score += 15
-    # 강한 모멘텀
-    if s["momentum_3m"] > 0.15:                            score += 15
-    if s["momentum_3m"] > 0.30:                            score += 10
+    if s["vol_ratio"] >= cfg["vol_ratio_buy"]:             score += 25
+    if s["vol_ratio"] >= cfg["vol_ratio_surge"]:           score += 15
+    if s["momentum_3m"] > cfg["momentum_min"] * 3:         score += 15
+    if s["momentum_3m"] > cfg["momentum_min"] * 6:         score += 10
     return min(score, 100.0)
+
+
+# ══════════════════════════════════════════════════════
+# 필수조건 게이트
+# ══════════════════════════════════════════════════════
+# 가중합만 쓰면 패턴의 핵심과 무관한 조건들로도 임계값을 넘김.
+# (예: Stage2는 "MA120 위 + 우상향" 2개만으로 50점 → 통과)
+# 각 패턴의 정의상 반드시 성립해야 하는 조건을 통과 조건으로 분리.
+
+def _base_ok(s: dict, cfg: dict) -> bool:
+    if not s["is_tradable"]:
+        return False
+    min_value = cfg.get("min_trading_value")
+    if min_value and s["avg_value_20"] < min_value:
+        return False
+    return True
+
+
+REQUIRED_FNS = {
+    "p1":      lambda s, c: s["partial_aligned"] and (s["obv_rising"] or s["bb_squeeze"]),
+    "p2":      lambda s, c: s["full_aligned"] and s["price_above_ma5"] and s["macd"] > 0,
+    "p3":      lambda s, c: s["is_pullback_range"] and s["above_ma20"],
+    "canslim": lambda s, c: s["pos_52w"] >= 0.75 and s["rs"] > 0 and s["vol_ratio"] >= c["vol_ratio_buy"] * 0.5,
+    "vcp":     lambda s, c: s["bb_squeeze"] and s["vol_contracting"] and s["partial_aligned"],
+    "stage2":  lambda s, c: s["price"] > s["ma120"] and s["ma120_rising"] and s["partial_aligned"] and s["rs"] > 0,
+    "wyckoff": lambda s, c: s["obv_rising"] and s["bb_squeeze"] and s["price"] > s["ma20"],
+    "darvas":  lambda s, c: s["pos_52w"] >= 0.80 and s["vol_ratio"] >= c["vol_ratio_buy"],
+}
 
 
 # ══════════════════════════════════════════════════════
 # 메인 실행
 # ══════════════════════════════════════════════════════
 
-SCORE_THRESHOLD     = 40
+SCORE_THRESHOLD     = 60
 ALL_PATTERN_KEYS    = ["p1", "p2", "p3", "canslim", "vcp", "stage2", "wyckoff", "darvas"]
 TREND_PATTERN_KEYS  = ["stage2", "canslim", "darvas"]   # 추세/돌파형 (신고가, 상승 추세)
 ACCUM_PATTERN_KEYS  = ["wyckoff", "vcp"]                # 매집/수축형 (조정, 매집 완료)
@@ -346,8 +392,19 @@ SCORE_FNS = {
     "darvas":  _score_darvas,
 }
 
+
+def score_pattern(key: str, s: dict, cfg: dict) -> float:
+    """필수조건 미충족 시 0점 — 스크리너와 백테스트가 동일 게이트를 공유"""
+    if not _base_ok(s, cfg):
+        return 0.0
+    if not REQUIRED_FNS[key](s, cfg):
+        return 0.0
+    return SCORE_FNS[key](s, cfg)
+
+
 BASE_COLS = ["ticker", "name", "market", "sector", "price", "ma5", "ma20", "ma60", "ma120",
-             "rsi", "macd", "vol_ratio", "momentum_3m", "rs", "pos_52w", "atr_14", "stop_swing", "stop_lt"]
+             "rsi", "macd", "vol_ratio", "avg_value_20", "momentum_3m", "rs", "pos_52w",
+             "atr_14", "stop_swing", "stop_lt"]
 
 EXTRA_COLS = {
     "p1":      ["bb_squeeze", "obv_rising", "obv_new_high", "bullish_ratio", "ma20_just_cross"],
@@ -364,14 +421,62 @@ EXTRA_COLS = {
 }
 
 
+def get_universe(cfg: dict) -> list[dict]:
+    """스크리닝 대상 종목 리스트 — 백테스트도 동일 유니버스를 사용"""
+    from market_config import CRYPTO_TICKERS
+
+    if cfg["type"] == "CRYPTO":
+        return [{"ticker": t, "name": t.split("/")[0], "market": "CRYPTO", "sector": ""}
+                for t in CRYPTO_TICKERS]
+
+    frames = []
+    for market in cfg["markets"]:
+        df_mkt = fdr.StockListing(market)
+        df_mkt["market"] = market
+        frames.append(df_mkt)
+
+    df = pd.concat(frames, ignore_index=True)
+
+    # 티커/이름 컬럼 통일
+    for src, dst in [("Symbol", "ticker"), ("Code", "ticker"), ("Name", "name")]:
+        if src in df.columns and dst not in df.columns:
+            df = df.rename(columns={src: dst})
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    before = len(df)
+
+    # 우선주/신주인수권 제외 — KRX 보통주는 종목코드 끝자리가 0
+    if cfg.get("common_stock_only"):
+        df = df[df["ticker"].astype(str).str.endswith("0")]
+
+    # 스팩/리츠 등 모멘텀 스크리닝에 부적합한 종목 제외
+    pattern = cfg.get("exclude_name_patterns")
+    if pattern and "name" in df.columns:
+        df = df[~df["name"].astype(str).str.contains(pattern, na=False)]
+
+    if cfg.get("min_marcap") and "Marcap" in df.columns:
+        df = df[df["Marcap"] > cfg["min_marcap"]]
+    if "Close" in df.columns:
+        df = df[df["Close"] > 0]
+
+    sector_col = next((c for c in df.columns if c.lower() in ("sector", "industry", "dept")), None)
+    if sector_col:
+        df = df.rename(columns={sector_col: "sector"})
+    else:
+        df["sector"] = ""
+
+    print(f"유니버스: {before} → {len(df)}종목 (우선주/스팩/시총 필터 적용)")
+    return df[["ticker", "name", "market", "sector"]].to_dict("records")
+
+
 def run(cfg: dict = None) -> dict:
-    from market_config import KR_CONFIG, CRYPTO_TICKERS
+    from market_config import KR_CONFIG
     if cfg is None:
         cfg = KR_CONFIG
 
     today      = datetime.today()
     skip_wknd  = cfg.get("skip_weekends", True)
-    start_date = _last_weekday(today - timedelta(days=270), skip_weekends=skip_wknd)
+    start_date = _last_weekday(today - timedelta(days=cfg.get("data_days", 420)), skip_weekends=skip_wknd)
     THRESHOLD  = cfg.get("score_threshold", SCORE_THRESHOLD)
 
     print(f"\n=== {cfg['name']} 스크리닝 ===")
@@ -379,62 +484,43 @@ def run(cfg: dict = None) -> dict:
     market_return = _get_market_return(start_date, benchmark=cfg["benchmark"])
     print(f"벤치마크 3M 수익률: {market_return*100:.1f}%")
 
-    # ── 종목 리스트 구성 ──────────────────────────────────
-    if cfg["type"] == "CRYPTO":
-        rows = [{"ticker": t, "name": t.split("/")[0], "market": "CRYPTO", "sector": ""}
-                for t in CRYPTO_TICKERS]
-    else:
-        frames = []
-        for market in cfg["markets"]:
-            df_mkt = fdr.StockListing(market)
-            df_mkt["market"] = market
-            frames.append(df_mkt)
-
-        df = pd.concat(frames, ignore_index=True)
-
-        # 티커/이름 컬럼 통일
-        for src, dst in [("Symbol", "ticker"), ("Code", "ticker"), ("Name", "name")]:
-            if src in df.columns and dst not in df.columns:
-                df = df.rename(columns={src: dst})
-        df = df.loc[:, ~df.columns.duplicated()]
-
-        # 시총 필터 (KR만)
-        if cfg.get("min_marcap") and "Marcap" in df.columns:
-            df = df[df["Marcap"] > cfg["min_marcap"]]
-        if "Close" in df.columns:
-            df = df[df["Close"] > 0]
-
-        # 섹터
-        sector_col = next((c for c in df.columns if c.lower() in ("sector", "industry", "dept")), None)
-        if sector_col:
-            df = df.rename(columns={sector_col: "sector"})
-        else:
-            df["sector"] = ""
-
-        print(f"종목 수: {len(df)}")
-        rows = df[["ticker", "name", "market", "sector"]].to_dict("records")
+    rows = get_universe(cfg)
 
     def fetch(row):
         s = _get_signals(row["ticker"], start_date, market_return, cfg=cfg)
         if s is None:
             return None
-        scores = {f"score_{k}": fn(s, cfg=cfg) for k, fn in SCORE_FNS.items()}
+        scores = {f"score_{k}": score_pattern(k, s, cfg) for k in ALL_PATTERN_KEYS}
         return {**row, **s, **scores}
 
-    results = []
+    results, failed = [], 0
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {executor.submit(fetch, row): row for row in rows}
         for i, future in enumerate(as_completed(futures), 1):
             r = future.result()
             if r:
                 results.append(r)
+            else:
+                failed += 1
             if i % 50 == 0:
                 print(f"진행: {i}/{len(rows)}")
 
+    fail_pct = failed / len(rows) * 100 if rows else 0
+    print(f"분석 완료: {len(results)}종목 성공 / {failed}종목 실패 ({fail_pct:.1f}%)")
+    if fail_pct > 30:
+        print(f"  ⚠ 실패율이 높습니다 — 데이터 소스 rate limit 또는 상장기간 부족 의심")
+
     if not results:
-        return {k: [] for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
+        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
 
     all_df = pd.DataFrame(results)
+
+    tradable = all_df["is_tradable"] & (all_df["avg_value_20"] >= (cfg.get("min_trading_value") or 0))
+    print(f"거래 가능 필터: {len(all_df)} → {int(tradable.sum())}종목 (거래정지/저유동성 제외)")
+    all_df = all_df[tradable]
+    if all_df.empty:
+        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
+
     common_extra = [c for c in EXTRA_COLS.get("common_trend", []) if c in all_df.columns]
 
     output = {}

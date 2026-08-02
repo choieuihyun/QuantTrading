@@ -4,8 +4,7 @@ import screener
 import firebase_upload
 import dart_fetcher
 import backtest
-from datetime import datetime, timedelta
-from market_config import ALL_CONFIGS, KR_CONFIG
+from market_config import ALL_CONFIGS
 
 PATTERN_NAMES = {
     "p1":         "정배열 퍼지기 직전 + 매집",
@@ -60,15 +59,17 @@ def main():
                 print("  " + df[cols].head(3).to_string())
 
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
+    # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면
+    # 이미 오른 종목의 과거를 재는 셈이라 승률이 부풀려짐
     all_backtest = {}
-    today = datetime.today()
 
     for market_key, cfg in ALL_CONFIGS.items():
-        skip_wknd = cfg.get("skip_weekends", True)
-        bt_start = screener._last_weekday(today - timedelta(days=500), skip_weekends=skip_wknd)
         print(f"\n[{cfg['name']}] 백테스트 실행 중...")
-        bt_results = backtest.run(all_market_results[market_key], bt_start, cfg=cfg)
-        all_backtest[market_key] = bt_results
+        try:
+            all_backtest[market_key] = backtest.run(cfg)
+        except Exception as e:
+            print(f"  백테스트 실패: {e}")
+            all_backtest[market_key] = {}
 
     # ── Firebase 업로드 ────────────────────────────────────
     firebase_upload.upload(all_market_results, run_type=run_type, backtest=all_backtest)
