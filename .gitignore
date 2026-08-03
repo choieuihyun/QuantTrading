@@ -1,0 +1,19 @@
+# 환경변수 — DART/Firebase 키 유출 방지
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 도구
+.serena/
+
+# OpenDartReader corp_code 캐시 (런타임 생성, 8MB+)
+docs_cache/
+
+# OS
+.DS_Store

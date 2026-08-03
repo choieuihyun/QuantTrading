@@ -59,6 +59,22 @@ function formatExtra(key: string, val: unknown): string {
   return String(val);
 }
 
+function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "pct" }) {
+  if (value === undefined || value === null || Number.isNaN(value))
+    return <span className="text-white/25">-</span>;
+  if (kind === "pct") {
+    const pct = value * 100;
+    return (
+      <span className={`font-mono text-sm ${pct >= 15 ? "text-emerald-400" : pct >= 8 ? "text-white/70" : "text-amber-400"}`}>
+        {pct.toFixed(1)}%
+      </span>
+    );
+  }
+  // 배수(PER/PBR/PSR): 낮을수록 저평가 → 초록
+  const color = value > 0 && value <= 10 ? "text-emerald-400" : value > 25 ? "text-rose-400" : "text-white/70";
+  return <span className={`font-mono text-sm ${color}`}>{value.toFixed(1)}</span>;
+}
+
 export function StockTable({ data, pattern }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [selected, setSelected] = useState<Stock | null>(null);
@@ -119,6 +135,11 @@ export function StockTable({ data, pattern }: Props) {
         return <span className={`font-mono text-sm ${v > 0 ? "text-emerald-400" : "text-rose-400"}`}>{v > 0 ? "+" : ""}{pct}%</span>;
       },
     },
+    // 펀더멘털 (KR만 값 존재, 그 외 "-") — 시총 ÷ TTM 재무값
+    { accessorKey: "per", header: "PER", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "pbr", header: "PBR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "psr", header: "PSR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "roe", header: "ROE", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="pct" /> },
     ...extraCols.map((key) => ({
       accessorKey: key as string,
       header: extraLabels[key as string],

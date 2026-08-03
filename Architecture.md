@@ -44,8 +44,11 @@ screener.yml이 하는 일 (순서대로):
   - `calc_signals_from_df()`: 지표 계산 (스크리너·백테스트 공용)
   - `score_pattern()`: 필수조건 게이트 + 가중합 점수 (스크리너·백테스트 공용)
 - `backtest.py`: 유니버스 표본을 과거 시점부터 스캔해 신호 성과 측정
-- `dart_fetcher.py`: DART API로 EPS/매출 성장률 보강 (KR만)
-- `firebase_upload.py`: 결과를 Firestore에 저장
+- `dart_fetcher.py`: DART `finstate_all`로 최근 8분기 재무 수집 → 파생지표 계산 (KR만)
+  - `account_id`(IFRS 코드)로 매칭, 손익은 `IS`/`CIS` 둘 다 탐색, 연결(CFS)→별도(OFS) 폴백
+  - `derive()`: TTM 매출/이익, ROE/ROA/마진/부채비율, 재고 QoQ/YoY/회전율
+  - `add_valuation()`: `Marcap` ÷ TTM 재무값 = PER/PBR/PSR (주가는 DART에 없어 시총과 결합)
+- `firebase_upload.py`: 결과를 Firestore에 저장 (`save_fundamentals()`로 재무 히스토리 별도 저장)
 - `main.py`: 위 모듈들을 순서대로 호출하는 진입점
 
 ### 3. Firebase Firestore — "데이터베이스"
@@ -67,7 +70,16 @@ screener.yml이 하는 일 (순서대로):
                              momentum_3m, rs, pos_52w, atr_14, stop_swing, score }, ... ]
       - kr_common_trend_count: 종목 수
       - us_*, crypto_* : 동일 구조 (마켓 prefix로 분리)
+      - (KR 종목 row에는 marcap, per, pbr, psr, roe 등 파생지표 포함)
       - backtest: { kr: { common_trend: {...}, ... }, us: {...}, crypto: {...} }
+
+  컬렉션: fundamentals          ← 분기 재무 히스토리 (재고 사이클/차트용, 종목별)
+    문서 ID: "005930" (종목코드)
+      - corp_code: DART 고유번호
+      - updated_at: 갱신 시각
+      - quarters: { "2026Q1": { rev, op, net, cogs, inventory, assets,
+                                liab, equity, receivables, cash, eps, ... }, ... }
+      ※ screener_results 문서 1MB 한도를 피하려 재무 원본은 여기 분리 저장
 ```
 
 ### 4. Next.js 대시보드 — "웹 화면"
@@ -188,7 +200,7 @@ QuantTrading/
 │   ├── market_config.py      # 시장별 설정 (유니버스/임계값/거래비용)
 │   ├── screener.py           # 시세 수집 + 지표 + 패턴 점수화
 │   ├── backtest.py           # 유니버스 표본 히스토리 스캔
-│   ├── dart_fetcher.py       # DART EPS/매출 성장률 (KR)
+│   ├── dart_fetcher.py       # DART finstate_all 8분기 재무 + 파생지표/밸류에이션 (KR)
 │   ├── firebase_upload.py    # Firestore 업로드
 │   └── requirements.txt      # Python 의존성
 ├── dashboard/

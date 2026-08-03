@@ -40,10 +40,13 @@ def main():
 
             if all_tickers:
                 print(f"\nDART 펀더멘털 수집 중 ({len(all_tickers)}종목)...")
-                dart_data = dart_fetcher.fetch_batch(list(all_tickers))
+                dart_data, histories = dart_fetcher.fetch_batch(list(all_tickers))
                 for key, df in results.items():
                     if hasattr(df, "empty") and not df.empty:
-                        results[key] = df.merge(dart_data, on="ticker", how="left")
+                        merged = df.merge(dart_data, on="ticker", how="left")
+                        results[key] = dart_fetcher.add_valuation(merged)
+                # 분기 재무 히스토리는 별도 컬렉션으로 저장 (재고 사이클/차트용)
+                firebase_upload.save_fundamentals(histories)
 
         all_market_results[market_key] = results
 

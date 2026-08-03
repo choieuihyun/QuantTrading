@@ -2,11 +2,12 @@
 import useSWR from "swr";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, Activity, BarChart2, Star, Zap, Layers, Eye, Box, Trophy } from "lucide-react";
+import { TrendingUp, Activity, BarChart2, Star, Zap, Layers, Eye, Box, Trophy, HelpCircle } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockTable } from "@/components/StockTable";
+import { PatternGuideModal } from "@/components/PatternGuideModal";
 import { fetchLatestResult } from "@/lib/fetcher";
 import type { PatternKey, MarketKey, Stock } from "@/lib/types";
 
@@ -49,6 +50,7 @@ export default function Home() {
     refreshInterval: 1000 * 60 * 5,
   });
   const [market, setMarket] = useState<MarketKey>("kr");
+  const [guide, setGuide] = useState<PatternKey | null>(null);
 
   const runAt = data?.run_at
     ? new Date(data.run_at.seconds * 1000).toLocaleString("ko-KR")
@@ -115,8 +117,16 @@ export default function Home() {
 
           {PATTERNS.map((p) => (
             <TabsContent key={p.key} value={p.key} className="mt-4">
-              <div className={`mb-4 px-4 py-3 rounded-xl ${p.bg} border border-white/5`}>
+              <div className={`mb-4 px-4 py-3 rounded-xl ${p.bg} border border-white/5 flex items-center justify-between gap-3`}>
                 <p className="text-sm text-white/60">{p.desc}</p>
+                <button
+                  onClick={() => setGuide(p.key)}
+                  aria-label={`${p.label} 자세한 설명`}
+                  className="shrink-0 flex items-center gap-1 text-xs text-white/40 hover:text-white/90 transition-colors"
+                >
+                  <HelpCircle size={16} />
+                  <span className="hidden sm:inline">설명</span>
+                </button>
               </div>
               {isLoading ? (
                 <div className="space-y-2">
@@ -131,6 +141,8 @@ export default function Home() {
           ))}
         </Tabs>
       </div>
+
+      <PatternGuideModal pattern={guide} onClose={() => setGuide(null)} />
     </main>
   );
 }

@@ -43,12 +43,27 @@ export interface Stock {
   near_52w_high?: boolean;
   // Common
   pattern_hits?: number;
-  // DART 펀더멘털
+  // DART 펀더멘털 (KR만)
+  marcap?: number;
   eps_current?: number;
-  eps_prev_year?: number;
   eps_yoy?: number;
   rev_yoy?: number;
   canslim_c?: boolean;
+  // 밸류에이션 (= 시총 ÷ TTM 재무값)
+  per?: number;
+  pbr?: number;
+  psr?: number;
+  // 수익성·안정성 (비율은 0~1 소수, 예: 0.173 = 17.3%)
+  roe?: number;
+  roa?: number;
+  op_margin?: number;
+  net_margin?: number;
+  debt_ratio?: number;
+  // 재고 사이클
+  inventory_qoq?: number;
+  inventory_yoy?: number;
+  inventory_turnover?: number;
+  latest_period?: string;
 }
 
 export type MarketKey = "kr" | "us" | "crypto";

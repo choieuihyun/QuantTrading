@@ -402,7 +402,7 @@ def score_pattern(key: str, s: dict, cfg: dict) -> float:
     return SCORE_FNS[key](s, cfg)
 
 
-BASE_COLS = ["ticker", "name", "market", "sector", "price", "ma5", "ma20", "ma60", "ma120",
+BASE_COLS = ["ticker", "name", "market", "sector", "marcap", "price", "ma5", "ma20", "ma60", "ma120",
              "rsi", "macd", "vol_ratio", "avg_value_20", "momentum_3m", "rs", "pos_52w",
              "atr_14", "stop_swing", "stop_lt"]
 
@@ -426,7 +426,7 @@ def get_universe(cfg: dict) -> list[dict]:
     from market_config import CRYPTO_TICKERS
 
     if cfg["type"] == "CRYPTO":
-        return [{"ticker": t, "name": t.split("/")[0], "market": "CRYPTO", "sector": ""}
+        return [{"ticker": t, "name": t.split("/")[0], "market": "CRYPTO", "sector": "", "marcap": None}
                 for t in CRYPTO_TICKERS]
 
     frames = []
@@ -465,8 +465,11 @@ def get_universe(cfg: dict) -> list[dict]:
     else:
         df["sector"] = ""
 
+    # 시가총액 — PER/PBR/PSR 계산용(= 시총 ÷ DART 재무값). US/코인은 없으면 None.
+    df["marcap"] = df["Marcap"] if "Marcap" in df.columns else None
+
     print(f"유니버스: {before} → {len(df)}종목 (우선주/스팩/시총 필터 적용)")
-    return df[["ticker", "name", "market", "sector"]].to_dict("records")
+    return df[["ticker", "name", "market", "sector", "marcap"]].to_dict("records")
 
 
 def run(cfg: dict = None) -> dict:

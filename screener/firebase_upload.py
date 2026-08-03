@@ -33,6 +33,33 @@ def _serialize_df(df) -> list:
     return records
 
 
+def save_fundamentals(histories: dict):
+    """
+    분기 재무 히스토리를 종목별 문서로 저장 (screener_results 문서 1MB 한도 회피).
+    histories: { ticker: {corp_code, quarters: {"2024Q3": {...}, ...}} }
+    """
+    if not histories:
+        return
+    _init_app()
+    db = firestore.client()
+
+    batch = db.batch()
+    n = 0
+    for ticker, payload in histories.items():
+        ref = db.collection("fundamentals").document(str(ticker))
+        batch.set(ref, {
+            "corp_code":  payload["corp_code"],
+            "updated_at": datetime.now(timezone.utc),
+            "quarters":   payload["quarters"],
+        })
+        n += 1
+        if n % 400 == 0:  # Firestore 배치 한도 500
+            batch.commit()
+            batch = db.batch()
+    batch.commit()
+    print(f"fundamentals 저장: {n}종목")
+
+
 def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None):
     """
     all_market_results: { "kr": {p1: df, ...}, "us": {...}, "crypto": {...} }
