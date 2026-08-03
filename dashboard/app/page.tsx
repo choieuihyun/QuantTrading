@@ -122,7 +122,9 @@ export default function Home() {
         ) : null}
 
         <Tabs defaultValue="common_trend">
-          <TabsList className="bg-white/5 border border-white/10 p-3 rounded-xl flex-col items-stretch h-auto gap-3">
+          {/* TabsList 기본값이 가로 탭 전제(inline-flex·w-fit·h-8)라 그룹 레이아웃과 충돌한다.
+              variant 접두사가 붙은 h-8은 같은 접두사로만 덮인다. */}
+          <TabsList className="flex w-full flex-col items-stretch justify-start gap-3 h-auto group-data-horizontal/tabs:h-auto bg-white/5 border border-white/10 p-3 rounded-xl">
             {GROUPS.map((g) => (
               <div key={g.key} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline gap-2 px-1">
@@ -137,7 +139,7 @@ export default function Home() {
                       <TabsTrigger
                         key={p.key}
                         value={p.key}
-                        className="flex items-center gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 rounded-lg px-3.5 py-2 text-sm transition-all"
+                        className="flex-none h-auto flex items-center gap-2 data-active:bg-white/10 data-active:text-white text-white/50 rounded-lg px-3.5 py-2 text-sm transition-all"
                       >
                         <Icon size={14} className={p.color} />
                         {p.label}

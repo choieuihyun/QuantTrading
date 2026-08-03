@@ -9,6 +9,7 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 import { ScoreBar } from "./ScoreBar";
 import { StockDetailModal } from "./StockDetailModal";
 import type { Stock } from "@/lib/types";
+import { isNum } from "@/lib/utils";
 
 import type { PatternKey } from "@/lib/types";
 
@@ -76,9 +77,8 @@ function ColToggle({ on, onClick, label }: { on: boolean; onClick: () => void; l
   );
 }
 
-function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "pct" }) {
-  if (value === undefined || value === null || Number.isNaN(value))
-    return <span className="text-white/25">-</span>;
+function FundCell({ value, kind }: { value: unknown; kind: "mult" | "pct" }) {
+  if (!isNum(value)) return <span className="text-white/25">-</span>;
   if (kind === "pct") {
     const pct = value * 100;
     return (
@@ -101,7 +101,7 @@ export function StockTable({ data, pattern, universe }: Props) {
 
   const extraCols = PATTERN_COLS[pattern];
   const extraLabels = PATTERN_LABELS[pattern];
-  const hasFundamentals = data.some((s) => s.per != null || s.roe != null);
+  const hasFundamentals = data.some((s) => isNum(s.per) || isNum(s.roe));
 
   const techCols: ColumnDef<Stock>[] = [
     {
@@ -133,16 +133,16 @@ export function StockTable({ data, pattern, universe }: Props) {
   ];
 
   const fundCols: ColumnDef<Stock>[] = [
-    { accessorKey: "per", header: "PER", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "pbr", header: "PBR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "psr", header: "PSR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "roe", header: "ROE", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="pct" /> },
+    { accessorKey: "per", header: "PER", cell: ({ getValue }) => <FundCell value={getValue()} kind="mult" /> },
+    { accessorKey: "pbr", header: "PBR", cell: ({ getValue }) => <FundCell value={getValue()} kind="mult" /> },
+    { accessorKey: "psr", header: "PSR", cell: ({ getValue }) => <FundCell value={getValue()} kind="mult" /> },
+    { accessorKey: "roe", header: "ROE", cell: ({ getValue }) => <FundCell value={getValue()} kind="pct" /> },
     {
       accessorKey: "inventory_yoy",
       header: "재고YoY",
       cell: ({ getValue }) => {
-        const v = getValue() as number | undefined;
-        if (v == null) return <span className="text-white/25">-</span>;
+        const v = getValue();
+        if (!isNum(v)) return <span className="text-white/25">-</span>;
         // 재고 감소는 업황 개선 신호라 초록
         return (
           <span className={`font-mono text-sm ${v < 0 ? "text-emerald-400" : "text-white/70"}`}>

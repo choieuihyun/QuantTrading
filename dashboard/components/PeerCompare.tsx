@@ -1,5 +1,6 @@
 "use client";
 import type { Stock } from "@/lib/types";
+import { isNum } from "@/lib/utils";
 
 interface Props {
   stock: Stock;
@@ -20,10 +21,10 @@ const KSIC2: Record<string, string> = {
 };
 
 function fmtMult(v?: number) {
-  return v == null ? "-" : v.toFixed(1);
+  return isNum(v) ? v.toFixed(1) : "-";
 }
 function fmtPct(v?: number) {
-  return v == null ? "-" : `${(v * 100).toFixed(1)}%`;
+  return isNum(v) ? `${(v * 100).toFixed(1)}%` : "-";
 }
 
 export function PeerCompare({ stock, universe }: Props) {
@@ -88,7 +89,7 @@ export function PeerCompare({ stock, universe }: Props) {
                   <td className="px-2.5 py-1.5 text-right font-mono text-white/70">{fmtPct(s.op_margin)}</td>
                   <td
                     className={`px-2.5 py-1.5 text-right font-mono ${
-                      s.inventory_yoy != null && s.inventory_yoy < 0 ? "text-emerald-400" : "text-white/70"
+                      isNum(s.inventory_yoy) && s.inventory_yoy < 0 ? "text-emerald-400" : "text-white/70"
                     }`}
                   >
                     {fmtPct(s.inventory_yoy)}

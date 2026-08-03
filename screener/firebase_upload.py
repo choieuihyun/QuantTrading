@@ -1,3 +1,4 @@
+import math
 import os
 from datetime import datetime, timezone
 
@@ -19,9 +20,13 @@ def _init_app():
 
 def _to_native(val):
     if hasattr(val, "item"):
-        return val.item()
+        val = val.item()
     if isinstance(val, bool):
         return bool(val)
+    # pandas가 결측을 NaN으로 바꿔 놓는데, 그대로 올리면 프론트의 null 검사를 통과해
+    # 화면에 "NaN%"으로 찍힌다. 여기서 None으로 정규화한다.
+    if isinstance(val, float) and math.isnan(val):
+        return None
     return val
 
 

@@ -5,6 +5,7 @@ import type { Stock } from "@/lib/types";
 import { MetricBadge } from "./MetricBadge";
 import { InventoryCycleChart } from "./InventoryCycleChart";
 import { PeerCompare } from "./PeerCompare";
+import { isNum } from "@/lib/utils";
 
 interface Props {
   stock: Stock | null;
@@ -94,41 +95,41 @@ export function StockDetailModal({ stock, onClose, universe = [] }: Props) {
           </div>
         </div>
 
-        {(stock.per != null || stock.roe != null || stock.inventory_qoq != null) && (
+        {(isNum(stock.per) || isNum(stock.roe) || isNum(stock.inventory_qoq)) && (
           <div className="mt-1">
             <p className="text-xs text-white/40 mb-1.5">
               펀더멘털 <span className="text-white/25">{stock.latest_period ? `· ${stock.latest_period} 기준` : ""}</span>
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {stock.per != null && <MetricBadge label="PER" value={stock.per.toFixed(1)} positive={stock.per > 0 && stock.per <= 10} />}
-              {stock.pbr != null && <MetricBadge label="PBR" value={stock.pbr.toFixed(2)} positive={stock.pbr > 0 && stock.pbr <= 1} />}
-              {stock.psr != null && <MetricBadge label="PSR" value={stock.psr.toFixed(2)} neutral />}
-              {stock.roe != null && <MetricBadge label="ROE" value={`${(stock.roe * 100).toFixed(1)}%`} positive={stock.roe >= 0.1} />}
-              {stock.op_margin != null && <MetricBadge label="영업이익률" value={`${(stock.op_margin * 100).toFixed(1)}%`} positive={stock.op_margin > 0} />}
-              {stock.debt_ratio != null && <MetricBadge label="부채비율" value={`${(stock.debt_ratio * 100).toFixed(0)}%`} positive={stock.debt_ratio < 1} />}
-              {stock.eps_yoy != null && <MetricBadge label="EPS성장" value={`${(stock.eps_yoy * 100).toFixed(0)}%`} positive={stock.eps_yoy > 0} />}
+              {isNum(stock.per) && <MetricBadge label="PER" value={stock.per.toFixed(1)} positive={stock.per > 0 && stock.per <= 10} />}
+              {isNum(stock.pbr) && <MetricBadge label="PBR" value={stock.pbr.toFixed(2)} positive={stock.pbr > 0 && stock.pbr <= 1} />}
+              {isNum(stock.psr) && <MetricBadge label="PSR" value={stock.psr.toFixed(2)} neutral />}
+              {isNum(stock.roe) && <MetricBadge label="ROE" value={`${(stock.roe * 100).toFixed(1)}%`} positive={stock.roe >= 0.1} />}
+              {isNum(stock.op_margin) && <MetricBadge label="영업이익률" value={`${(stock.op_margin * 100).toFixed(1)}%`} positive={stock.op_margin > 0} />}
+              {isNum(stock.debt_ratio) && <MetricBadge label="부채비율" value={`${(stock.debt_ratio * 100).toFixed(0)}%`} positive={stock.debt_ratio < 1} />}
+              {isNum(stock.eps_yoy) && <MetricBadge label="EPS성장" value={`${(stock.eps_yoy * 100).toFixed(0)}%`} positive={stock.eps_yoy > 0} />}
             </div>
-            {(stock.inventory_qoq != null || stock.inventory_yoy != null) && (
+            {(isNum(stock.inventory_qoq) || isNum(stock.inventory_yoy)) && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {stock.inventory_qoq != null && <MetricBadge label="재고QoQ" value={`${(stock.inventory_qoq * 100).toFixed(1)}%`} positive={stock.inventory_qoq < 0} />}
-                {stock.inventory_yoy != null && <MetricBadge label="재고YoY" value={`${(stock.inventory_yoy * 100).toFixed(1)}%`} positive={stock.inventory_yoy < 0} />}
-                {stock.inventory_turnover != null && <MetricBadge label="재고회전율" value={stock.inventory_turnover.toFixed(1)} neutral />}
+                {isNum(stock.inventory_qoq) && <MetricBadge label="재고QoQ" value={`${(stock.inventory_qoq * 100).toFixed(1)}%`} positive={stock.inventory_qoq < 0} />}
+                {isNum(stock.inventory_yoy) && <MetricBadge label="재고YoY" value={`${(stock.inventory_yoy * 100).toFixed(1)}%`} positive={stock.inventory_yoy < 0} />}
+                {isNum(stock.inventory_turnover) && <MetricBadge label="재고회전율" value={stock.inventory_turnover.toFixed(1)} neutral />}
               </div>
             )}
-            {(stock.capex_trend != null || stock.capex_intensity != null) && (
+            {(isNum(stock.capex_trend) || isNum(stock.capex_intensity)) && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {/* 투자 축소가 공급 조절 신호라 감소(음수)를 긍정으로 표시 — 재고와 동일한 방향 */}
-                {stock.capex_trend != null && (
+                {isNum(stock.capex_trend) && (
                   <MetricBadge
                     label="CAPEX추세"
                     value={`${stock.capex_trend > 0 ? "+" : ""}${(stock.capex_trend * 100).toFixed(0)}%`}
                     positive={stock.capex_trend < 0}
                   />
                 )}
-                {stock.capex_intensity != null && (
+                {isNum(stock.capex_intensity) && (
                   <MetricBadge label="CAPEX강도" value={`${(stock.capex_intensity * 100).toFixed(1)}%`} neutral />
                 )}
-                {stock.fcf_margin != null && (
+                {isNum(stock.fcf_margin) && (
                   <MetricBadge label="FCF마진" value={`${(stock.fcf_margin * 100).toFixed(1)}%`} positive={stock.fcf_margin > 0} />
                 )}
               </div>
