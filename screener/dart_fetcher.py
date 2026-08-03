@@ -33,8 +33,12 @@ ACCOUNTS = {
     "inventory":  ("BS", ["ifrs-full_Inventories"]),
     "receivables":("BS", ["ifrs-full_CurrentTradeReceivables", "ifrs-full_TradeAndOtherCurrentReceivables"]),
     "cash":       ("BS", ["ifrs-full_CashAndCashEquivalents"]),
+    # 현금흐름표 — 3사 모두 동일 id 확인. 유형자산의 취득 = CAPEX(유출이지만 양수로 옴)
+    "cfo":        ("CF", ["ifrs-full_CashFlowsFromUsedInOperatingActivities"]),
+    "capex":      ("CF", ["ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"]),
 }
-FLOW_FIELDS = {"rev", "cogs", "op", "net", "eps"}  # 손익 = 흐름값
+FLOW_FIELDS = {"rev", "cogs", "op", "net", "eps"}  # 손익 = 당기 3개월 단독값
+CF_FIELDS = {"cfo", "capex"}  # 현금흐름 = 기초부터 누적값(반대 성격) → 차감 필요
 
 
 def _client():
@@ -68,7 +72,7 @@ def _fetch_period(dart, corp_code: str, year: int, reprt: str) -> dict | None:
 
     rec = {"y": year, "q": REPRT_Q[reprt], "reprt": reprt}
     for field, (grp, acc_ids) in ACCOUNTS.items():
-        divs = ("BS",) if grp == "BS" else IS_DIVS
+        divs = IS_DIVS if grp == "IS" else (grp,)
         rows = df[(df["sj_div"].isin(divs)) & (df["account_id"].isin(acc_ids))]
         rec[field] = _num(rows.iloc[0].get("thstrm_amount")) if not rows.empty else None
         # 손익 누적값(9개월 등) — 연간의 Q4 단독 계산에 필요
@@ -91,9 +95,11 @@ def _is_due(year: int, q: int, today) -> bool:
     return (today.year, today.month, today.day) >= (year, m, d)
 
 
-def fetch_history(dart, corp_code: str, existing: dict | None = None, want: int = 8) -> dict:
+def fetch_history(dart, corp_code: str, existing: dict | None = None, want: int = 10) -> dict:
     """
     최근 want개 분기 원본 재무 히스토리. existing에 이미 있는 분기는 건너뜀(증분).
+    10분기인 이유: CF 단독값은 직전 분기가 있어야 계산되므로 가장 오래된 1개가 소실된다.
+    TTM(4) + 직전 TTM(4) = 8개 단독값을 확보하려면 9분기 이상 필요.
     반환: { "2024Q3": {rec}, ... }
     """
     hist = dict(existing or {})
@@ -136,6 +142,27 @@ def _single_flow(hist_list: list, field: str) -> dict:
     return out
 
 
+def _single_cum_flow(hist_list: list, field: str) -> dict:
+    """
+    현금흐름표는 기초부터 누적값(thstrm_add_amount 없음) → 단독 분기 = 당분기누적 − 직전분기누적.
+    직전 분기가 없으면 계산 불가(None). 누적값을 그대로 쓰면 분기값이 부풀려지므로 절대 폴백 금지.
+    """
+    by_yq = {(r["y"], r["q"]): r for r in hist_list}
+    out = {}
+    for r in hist_list:
+        y, q = r["y"], r["q"]
+        cur = r.get(field)
+        if cur is None:
+            out[(y, q)] = None
+        elif q == 1:
+            out[(y, q)] = cur  # 1Q 누적 = 1Q 단독
+        else:
+            prev = by_yq.get((y, q - 1))
+            pv = prev.get(field) if prev else None
+            out[(y, q)] = (cur - pv) if pv is not None else None
+    return out
+
+
 def _ttm(single: dict, keys_desc: list) -> float | None:
     """최신 4개 분기 단독값 합. 중간 분기가 누락돼 4개가 연속이 아니면 None(조용한 오류 방지).
     rate-limit(020)와 미공시가 구분 안 되므로, 비연속이면 합산하지 않는다."""
@@ -166,6 +193,9 @@ def derive(hist: dict) -> dict:
         "op_margin": None, "net_margin": None, "debt_ratio": None,
         "inventory_qoq": None, "inventory_yoy": None, "inventory_turnover": None,
         "latest_period": None,
+        # CAPEX 사이클 — 공급이 반도체 사이클을 결정하므로 투자 축소가 반등 선행 신호
+        "ttm_capex": None, "ttm_cfo": None, "capex_intensity": None,
+        "capex_trend": None, "fcf": None, "fcf_margin": None,
     }
     if not hist:
         return out
@@ -214,6 +244,23 @@ def derive(hist: dict) -> dict:
     out["op_margin"] = _ratio(out["ttm_op_income"], out["ttm_revenue"])
     out["net_margin"] = _ratio(out["ttm_net_income"], out["ttm_revenue"])
     out["debt_ratio"] = _ratio(out["latest_liabilities"], out["latest_equity"])
+
+    # CAPEX 사이클 — CF는 누적이라 전용 차감 경로를 쓴다
+    cfo_s   = _single_cum_flow(hlist, "cfo")
+    capex_s = _single_cum_flow(hlist, "capex")
+    ttm_capex = _ttm(capex_s, kd)
+    out["ttm_capex"] = ttm_capex
+    out["ttm_cfo"] = _ttm(cfo_s, kd)
+    # CAPEX 강도 = 매출 대비 설비투자 (ttm_revenue가 아직 살아 있는 여기서 계산해야 함)
+    out["capex_intensity"] = _ratio(ttm_capex, out["ttm_revenue"])
+    # 최근 4분기 vs 그 이전 4분기 — 투자 축소(음수)가 공급 조절 = 사이클 반등 준비 신호
+    prev_ttm_capex = _ttm(capex_s, kd[4:])
+    if ttm_capex is not None and prev_ttm_capex:
+        out["capex_trend"] = round((ttm_capex - prev_ttm_capex) / abs(prev_ttm_capex), 4)
+    # 유형자산 취득은 유출이지만 양수로 오므로 부호 반전 없이 차감
+    if out["ttm_cfo"] is not None and ttm_capex is not None:
+        out["fcf"] = out["ttm_cfo"] - ttm_capex
+        out["fcf_margin"] = _ratio(out["fcf"], out["ttm_revenue"])
 
     # 재고 사이클
     inv_now = latest.get("inventory")
@@ -282,11 +329,12 @@ DISPLAY_COLS = [
     "per", "pbr", "psr", "roe", "roa", "op_margin", "net_margin", "debt_ratio",
     "inventory_qoq", "inventory_yoy", "inventory_turnover",
     "eps_current", "eps_yoy", "rev_yoy", "canslim_c", "latest_period", "induty",
+    "capex_intensity", "capex_trend", "fcf_margin",
 ]
 _RAW_DROP = [
     "ttm_revenue", "ttm_op_income", "ttm_net_income",
     "latest_equity", "latest_assets", "latest_liabilities", "latest_inventory",
-    "eps_prev_year",
+    "eps_prev_year", "ttm_capex", "ttm_cfo", "fcf",
 ]
 
 
