@@ -62,6 +62,21 @@ export default function Home() {
     return ((data as Record<string, unknown>)?.[key] as Stock[]) ?? [];
   };
 
+  // 동종업계 비교용 — 현재 시장의 전 패턴 종목 합집합(중복 티커 제거)
+  const universe: Stock[] = (() => {
+    const seen = new Set<string>();
+    const out: Stock[] = [];
+    for (const p of PATTERNS) {
+      for (const s of getPatternData(p.key)) {
+        if (!seen.has(s.ticker)) {
+          seen.add(s.ticker);
+          out.push(s);
+        }
+      }
+    }
+    return out;
+  })();
+
   return (
     <main className="min-h-screen bg-[#080a0f] text-white">
       <Header runAt={runAt ?? undefined} />
@@ -133,7 +148,7 @@ export default function Home() {
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 bg-white/5 rounded-lg" />)}
                 </div>
               ) : data ? (
-                <StockTable data={getPatternData(p.key)} pattern={p.key} />
+                <StockTable data={getPatternData(p.key)} pattern={p.key} universe={universe} />
               ) : (
                 <div className="py-20 text-center text-white/30">데이터가 없습니다</div>
               )}

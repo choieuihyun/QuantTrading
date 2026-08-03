@@ -64,6 +64,28 @@ export interface Stock {
   inventory_yoy?: number;
   inventory_turnover?: number;
   latest_period?: string;
+  induty?: string; // KSIC 업종코드 (동종업계 비교용)
+}
+
+/** fundamentals/{ticker} — 분기 재무 원본 */
+export interface QuarterRecord {
+  y: number;
+  q: number;
+  rev?: number | null;
+  cogs?: number | null;
+  op?: number | null;
+  net?: number | null;
+  inventory?: number | null;
+  assets?: number | null;
+  liab?: number | null;
+  equity?: number | null;
+  receivables?: number | null;
+  cash?: number | null;
+}
+
+export interface Fundamentals {
+  corp_code: string;
+  quarters: Record<string, QuarterRecord>;
 }
 
 export type MarketKey = "kr" | "us" | "crypto";

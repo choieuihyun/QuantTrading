@@ -3,13 +3,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import type { Stock } from "@/lib/types";
 import { MetricBadge } from "./MetricBadge";
+import { InventoryCycleChart } from "./InventoryCycleChart";
+import { PeerCompare } from "./PeerCompare";
 
 interface Props {
   stock: Stock | null;
   onClose: () => void;
+  universe?: Stock[];
 }
 
-export function StockDetailModal({ stock, onClose }: Props) {
+export function StockDetailModal({ stock, onClose, universe = [] }: Props) {
   if (!stock) return null;
 
   const radarData = [
@@ -24,7 +27,7 @@ export function StockDetailModal({ stock, onClose }: Props) {
 
   return (
     <Dialog open={!!stock} onOpenChange={onClose}>
-      <DialogContent className="bg-[#0f1117] border-white/10 text-white max-w-2xl">
+      <DialogContent className="bg-[#0f1117] border-white/10 text-white max-w-2xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="text-xl font-bold">{stock.name}</span>
@@ -112,6 +115,18 @@ export function StockDetailModal({ stock, onClose }: Props) {
                 {stock.inventory_turnover != null && <MetricBadge label="재고회전율" value={stock.inventory_turnover.toFixed(1)} neutral />}
               </div>
             )}
+          </div>
+        )}
+
+        {stock.market !== "CRYPTO" && stock.latest_period && (
+          <div className="mt-1">
+            <InventoryCycleChart ticker={stock.ticker} />
+          </div>
+        )}
+
+        {universe.length > 0 && (
+          <div className="mt-1">
+            <PeerCompare stock={stock} universe={universe} />
           </div>
         )}
 

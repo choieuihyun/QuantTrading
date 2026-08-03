@@ -257,6 +257,8 @@ def fetch_batch(tickers: list[str], existing_map: dict | None = None) -> tuple[p
             hist = fetch_history(dart, corp_code, existing_map.get(ticker, {}).get("quarters"))
             d = derive(hist)
             d["ticker"] = ticker
+            # KSIC 업종코드 — FDR의 Dept가 전부 비어 있어 동종업계 비교는 이걸로 묶음
+            d["induty"] = str(corp.get("induty_code") or "")
             return d, corp_code, hist
         except Exception:
             return {"ticker": ticker}, None, {}
@@ -279,7 +281,7 @@ def fetch_batch(tickers: list[str], existing_map: dict | None = None) -> tuple[p
 DISPLAY_COLS = [
     "per", "pbr", "psr", "roe", "roa", "op_margin", "net_margin", "debt_ratio",
     "inventory_qoq", "inventory_yoy", "inventory_turnover",
-    "eps_current", "eps_yoy", "rev_yoy", "canslim_c", "latest_period",
+    "eps_current", "eps_yoy", "rev_yoy", "canslim_c", "latest_period", "induty",
 ]
 _RAW_DROP = [
     "ttm_revenue", "ttm_op_income", "ttm_net_income",

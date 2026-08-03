@@ -80,7 +80,14 @@ screener.yml이 하는 일 (순서대로):
       - quarters: { "2026Q1": { rev, op, net, cogs, inventory, assets,
                                 liab, equity, receivables, cash, eps, ... }, ... }
       ※ screener_results 문서 1MB 한도를 피하려 재무 원본은 여기 분리 저장
+      ※ 대시보드가 종목 모달에서 지연 로딩 → Firestore 규칙에 읽기 허용 필요
 ```
+
+**주의 — DART 데이터 성격 차이 (실측 확인)**
+- 손익계산서(IS/CIS) `thstrm_amount` = **당기 3개월 단독값** → 차감 불필요
+- 현금흐름표(CF) `thstrm_amount` = **기초부터 누적값** → 분기 단독값은 차감 필요
+- 재무상태표(BS) = 시점값
+- 업종 구분은 FDR `Dept`가 비어 있어 DART `induty_code`(KSIC) 사용
 
 ### 4. Next.js 대시보드 — "웹 화면"
 

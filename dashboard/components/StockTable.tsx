@@ -15,6 +15,7 @@ import type { PatternKey } from "@/lib/types";
 interface Props {
   data: Stock[];
   pattern: PatternKey;
+  universe?: Stock[]; // 동종업계 비교용 — 전 패턴 종목 합집합
 }
 
 const PATTERN_COLS: Record<string, (keyof Stock)[]> = {
@@ -75,7 +76,7 @@ function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "
   return <span className={`font-mono text-sm ${color}`}>{value.toFixed(1)}</span>;
 }
 
-export function StockTable({ data, pattern }: Props) {
+export function StockTable({ data, pattern, universe }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [selected, setSelected] = useState<Stock | null>(null);
 
@@ -214,7 +215,7 @@ export function StockTable({ data, pattern }: Props) {
           <div className="py-16 text-center text-white/30 text-sm">조건에 맞는 종목이 없습니다</div>
         )}
       </div>
-      <StockDetailModal stock={selected} onClose={() => setSelected(null)} />
+      <StockDetailModal stock={selected} onClose={() => setSelected(null)} universe={universe} />
     </>
   );
 }
