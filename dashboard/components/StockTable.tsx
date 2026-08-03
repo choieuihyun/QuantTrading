@@ -60,6 +60,22 @@ function formatExtra(key: string, val: unknown): string {
   return String(val);
 }
 
+function ColToggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
+        on
+          ? "bg-white/10 border-white/20 text-white/90"
+          : "bg-transparent border-white/10 text-white/40 hover:text-white/70"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "pct" }) {
   if (value === undefined || value === null || Number.isNaN(value))
     return <span className="text-white/25">-</span>;
@@ -79,28 +95,15 @@ function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "
 export function StockTable({ data, pattern, universe }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [selected, setSelected] = useState<Stock | null>(null);
+  // 기본은 좁게 — 15개 컬럼을 한 번에 늘어놓으면 스캔이 안 된다
+  const [showTech, setShowTech] = useState(false);
+  const [showFund, setShowFund] = useState(false);
 
   const extraCols = PATTERN_COLS[pattern];
   const extraLabels = PATTERN_LABELS[pattern];
+  const hasFundamentals = data.some((s) => s.per != null || s.roe != null);
 
-  const columns: ColumnDef<Stock>[] = [
-    {
-      accessorKey: "ticker",
-      header: "종목",
-      cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-white">{row.original.name}</div>
-          <div className="text-xs text-white/40 font-mono">{row.original.ticker} · {row.original.market}</div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "price",
-      header: "현재가",
-      cell: ({ getValue }) => (
-        <span className="font-mono text-white/90">{(getValue() as number).toLocaleString()}</span>
-      ),
-    },
+  const techCols: ColumnDef<Stock>[] = [
     {
       accessorKey: "rsi",
       header: "RSI",
@@ -127,6 +130,47 @@ export function StockTable({ data, pattern, universe }: Props) {
         </span>
       ),
     },
+  ];
+
+  const fundCols: ColumnDef<Stock>[] = [
+    { accessorKey: "per", header: "PER", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "pbr", header: "PBR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "psr", header: "PSR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
+    { accessorKey: "roe", header: "ROE", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="pct" /> },
+    {
+      accessorKey: "inventory_yoy",
+      header: "재고YoY",
+      cell: ({ getValue }) => {
+        const v = getValue() as number | undefined;
+        if (v == null) return <span className="text-white/25">-</span>;
+        // 재고 감소는 업황 개선 신호라 초록
+        return (
+          <span className={`font-mono text-sm ${v < 0 ? "text-emerald-400" : "text-white/70"}`}>
+            {(v * 100).toFixed(1)}%
+          </span>
+        );
+      },
+    },
+  ];
+
+  const columns: ColumnDef<Stock>[] = [
+    {
+      accessorKey: "ticker",
+      header: "종목",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-semibold text-white">{row.original.name}</div>
+          <div className="text-xs text-white/40 font-mono">{row.original.ticker} · {row.original.market}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "price",
+      header: "현재가",
+      cell: ({ getValue }) => (
+        <span className="font-mono text-white/90">{(getValue() as number).toLocaleString()}</span>
+      ),
+    },
     {
       accessorKey: "momentum_3m",
       header: "3M",
@@ -136,11 +180,8 @@ export function StockTable({ data, pattern, universe }: Props) {
         return <span className={`font-mono text-sm ${v > 0 ? "text-emerald-400" : "text-rose-400"}`}>{v > 0 ? "+" : ""}{pct}%</span>;
       },
     },
-    // 펀더멘털 (KR만 값 존재, 그 외 "-") — 시총 ÷ TTM 재무값
-    { accessorKey: "per", header: "PER", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "pbr", header: "PBR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "psr", header: "PSR", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="mult" /> },
-    { accessorKey: "roe", header: "ROE", cell: ({ getValue }) => <FundCell value={getValue() as number} kind="pct" /> },
+    ...(showTech ? techCols : []),
+    ...(showFund && hasFundamentals ? fundCols : []),
     ...extraCols.map((key) => ({
       accessorKey: key as string,
       header: extraLabels[key as string],
@@ -169,7 +210,19 @@ export function StockTable({ data, pattern, universe }: Props) {
 
   return (
     <>
-      <div className="rounded-xl border border-white/10 overflow-hidden">
+      <div className="flex items-center justify-between mb-2 gap-3">
+        <span className="text-xs text-white/30">
+          {data.length}종목 · 행을 누르면 상세
+        </span>
+        <div className="flex items-center gap-1.5">
+          <ColToggle on={showTech} onClick={() => setShowTech((v) => !v)} label="기술지표" />
+          {hasFundamentals && (
+            <ColToggle on={showFund} onClick={() => setShowFund((v) => !v)} label="펀더멘털" />
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-white/10 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             {table.getHeaderGroups().map((hg) => (

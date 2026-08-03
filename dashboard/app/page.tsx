@@ -17,18 +17,26 @@ const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
   { key: "crypto", label: "코인",   flag: "₿"   },
 ];
 
-const PATTERNS: { key: PatternKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { key: "common_trend", label: "★ 추세 공통",  desc: "Stage2 + CAN SLIM + Darvas 중 2개+ — 신고가형 상승 추세", icon: Trophy,  color: "text-yellow-400",  bg: "bg-yellow-500/10" },
-  { key: "common_accum", label: "★ 매집 공통",  desc: "Wyckoff + VCP 둘 다 해당 — 조정/매집 완료 폭발 직전",  icon: Eye,     color: "text-rose-300",    bg: "bg-rose-500/10" },
-  { key: "common_all",   label: "☆ 내 패턴 공통", desc: "정배열매집 + 5일선추세 + 눌림목 중 2개+ — 참고용",  icon: Star,    color: "text-white/50",    bg: "bg-white/5" },
-  { key: "p1",      label: "정배열 + 매집",    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",           icon: TrendingUp, color: "text-indigo-400", bg: "bg-indigo-500/10" },
-  { key: "p2",      label: "5일선 추세",       desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",              icon: Activity,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  { key: "p3",      label: "눌림목",           desc: "피보나치 되돌림 구간 + MACD 반등",                    icon: BarChart2, color: "text-amber-400",   bg: "bg-amber-500/10" },
-  { key: "canslim", label: "CAN SLIM",         desc: "O'Neil — 52주 신고가 + 거래량 폭발 + 상대강도",       icon: Star,      color: "text-blue-400",    bg: "bg-blue-500/10" },
-  { key: "vcp",     label: "VCP",              desc: "Minervini — 변동성 수축 후 돌파 직전",                icon: Zap,       color: "text-purple-400",  bg: "bg-purple-500/10" },
-  { key: "stage2",  label: "Stage 2",          desc: "Weinstein — MA120 위 + 우상향 안정 추세",             icon: Layers,    color: "text-cyan-400",    bg: "bg-cyan-500/10" },
-  { key: "wyckoff", label: "Wyckoff",          desc: "Wyckoff — OBV 신고점 스마트머니 매집",                icon: Eye,       color: "text-rose-400",    bg: "bg-rose-500/10" },
-  { key: "darvas",  label: "Darvas Box",       desc: "Darvas — 52주 신고가 박스권 돌파 + 거래량 폭발",      icon: Box,       color: "text-orange-400",  bg: "bg-orange-500/10" },
+// 패턴을 성격별 3그룹으로 묶어 위계를 만든다 — 11개를 한 줄에 늘어놓으면 무엇부터 볼지 알 수 없다
+const GROUPS = [
+  { key: "common", label: "★ 공통 신호", hint: "여러 기법이 동시에 가리킴 · 신뢰도 최상" },
+  { key: "legend", label: "전설 기법",   hint: "검증된 트레이더 방법론" },
+  { key: "custom", label: "내 패턴",     hint: "한국 시장 특화 자체 개발" },
+] as const;
+type GroupKey = (typeof GROUPS)[number]["key"];
+
+const PATTERNS: { key: PatternKey; group: GroupKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
+  { key: "common_trend", group: "common", label: "★ 추세 공통",  desc: "Stage2 + CAN SLIM + Darvas 중 2개+ — 신고가형 상승 추세", icon: Trophy,  color: "text-yellow-400",  bg: "bg-yellow-500/10" },
+  { key: "common_accum", group: "common", label: "★ 매집 공통",  desc: "Wyckoff + VCP 둘 다 해당 — 조정/매집 완료 폭발 직전",  icon: Eye,     color: "text-rose-300",    bg: "bg-rose-500/10" },
+  { key: "common_all",   group: "common", label: "☆ 내 패턴 공통", desc: "정배열매집 + 5일선추세 + 눌림목 중 2개+ — 참고용",  icon: Star,    color: "text-white/50",    bg: "bg-white/5" },
+  { key: "canslim", group: "legend", label: "CAN SLIM",         desc: "O'Neil — 52주 신고가 + 거래량 폭발 + 상대강도",       icon: Star,      color: "text-blue-400",    bg: "bg-blue-500/10" },
+  { key: "vcp",     group: "legend", label: "VCP",              desc: "Minervini — 변동성 수축 후 돌파 직전",                icon: Zap,       color: "text-purple-400",  bg: "bg-purple-500/10" },
+  { key: "stage2",  group: "legend", label: "Stage 2",          desc: "Weinstein — MA120 위 + 우상향 안정 추세",             icon: Layers,    color: "text-cyan-400",    bg: "bg-cyan-500/10" },
+  { key: "wyckoff", group: "legend", label: "Wyckoff",          desc: "Wyckoff — OBV 신고점 스마트머니 매집",                icon: Eye,       color: "text-rose-400",    bg: "bg-rose-500/10" },
+  { key: "darvas",  group: "legend", label: "Darvas Box",       desc: "Darvas — 52주 신고가 박스권 돌파 + 거래량 폭발",      icon: Box,       color: "text-orange-400",  bg: "bg-orange-500/10" },
+  { key: "p1",      group: "custom", label: "정배열 + 매집",    desc: "이평선 정배열 퍼지기 직전 + OBV 매집 신호",           icon: TrendingUp, color: "text-indigo-400", bg: "bg-indigo-500/10" },
+  { key: "p2",      group: "custom", label: "5일선 추세",       desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",              icon: Activity,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  { key: "p3",      group: "custom", label: "눌림목",           desc: "피보나치 되돌림 구간 + MACD 반등",                    icon: BarChart2, color: "text-amber-400",   bg: "bg-amber-500/10" },
 ];
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
@@ -114,20 +122,34 @@ export default function Home() {
         ) : null}
 
         <Tabs defaultValue="common_trend">
-          <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl flex-wrap h-auto gap-1">
-            {PATTERNS.map((p) => {
-              const Icon = p.icon;
-              return (
-                <TabsTrigger
-                  key={p.key}
-                  value={p.key}
-                  className="flex items-center gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 rounded-lg px-4 py-2 text-sm transition-all"
-                >
-                  <Icon size={14} className={p.color} />
-                  {p.label}
-                </TabsTrigger>
-              );
-            })}
+          <TabsList className="bg-white/5 border border-white/10 p-3 rounded-xl flex-col items-stretch h-auto gap-3">
+            {GROUPS.map((g) => (
+              <div key={g.key} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline gap-2 px-1">
+                  <span className="text-[11px] font-medium text-white/50 tracking-wide">{g.label}</span>
+                  <span className="text-[10px] text-white/25">{g.hint}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {PATTERNS.filter((p) => p.group === g.key).map((p) => {
+                    const Icon = p.icon;
+                    const count = getPatternData(p.key).length;
+                    return (
+                      <TabsTrigger
+                        key={p.key}
+                        value={p.key}
+                        className="flex items-center gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50 rounded-lg px-3.5 py-2 text-sm transition-all"
+                      >
+                        <Icon size={14} className={p.color} />
+                        {p.label}
+                        {data && (
+                          <span className="text-[10px] font-mono text-white/30 tabular-nums">{count}</span>
+                        )}
+                      </TabsTrigger>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </TabsList>
 
           {PATTERNS.map((p) => (
