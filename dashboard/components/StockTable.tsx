@@ -95,9 +95,9 @@ function FundCell({ value, kind }: { value: number | undefined; kind: "mult" | "
 export function StockTable({ data, pattern, universe }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [selected, setSelected] = useState<Stock | null>(null);
-  // 기본은 좁게 — 15개 컬럼을 한 번에 늘어놓으면 스캔이 안 된다
+  // 펀더멘털은 기본 노출(리스트에서 바로 봐야 하는 지표), 기술지표는 접어서 폭을 줄인다
   const [showTech, setShowTech] = useState(false);
-  const [showFund, setShowFund] = useState(false);
+  const [showFund, setShowFund] = useState(true);
 
   const extraCols = PATTERN_COLS[pattern];
   const extraLabels = PATTERN_LABELS[pattern];

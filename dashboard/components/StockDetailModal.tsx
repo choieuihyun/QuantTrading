@@ -115,6 +115,24 @@ export function StockDetailModal({ stock, onClose, universe = [] }: Props) {
                 {stock.inventory_turnover != null && <MetricBadge label="재고회전율" value={stock.inventory_turnover.toFixed(1)} neutral />}
               </div>
             )}
+            {(stock.capex_trend != null || stock.capex_intensity != null) && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {/* 투자 축소가 공급 조절 신호라 감소(음수)를 긍정으로 표시 — 재고와 동일한 방향 */}
+                {stock.capex_trend != null && (
+                  <MetricBadge
+                    label="CAPEX추세"
+                    value={`${stock.capex_trend > 0 ? "+" : ""}${(stock.capex_trend * 100).toFixed(0)}%`}
+                    positive={stock.capex_trend < 0}
+                  />
+                )}
+                {stock.capex_intensity != null && (
+                  <MetricBadge label="CAPEX강도" value={`${(stock.capex_intensity * 100).toFixed(1)}%`} neutral />
+                )}
+                {stock.fcf_margin != null && (
+                  <MetricBadge label="FCF마진" value={`${(stock.fcf_margin * 100).toFixed(1)}%`} positive={stock.fcf_margin > 0} />
+                )}
+              </div>
+            )}
           </div>
         )}
 

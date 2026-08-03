@@ -63,6 +63,10 @@ export interface Stock {
   inventory_qoq?: number;
   inventory_yoy?: number;
   inventory_turnover?: number;
+  // CAPEX 사이클 — 투자 축소(capex_trend 음수)가 공급 조절 = 업황 반등 선행 신호
+  capex_intensity?: number; // TTM CAPEX / TTM 매출
+  capex_trend?: number; // 최근 4분기 CAPEX vs 직전 4분기
+  fcf_margin?: number; // (영업CF − CAPEX) / 매출
   latest_period?: string;
   induty?: string; // KSIC 업종코드 (동종업계 비교용)
 }
