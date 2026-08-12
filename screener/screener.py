@@ -791,6 +791,8 @@ def run(cfg: dict = None) -> dict:
 
     # ── 공통 추출 ────────────────────────────────────────
     # 서로 다른 기법이 같은 종목을 동시에 가리키면 신뢰도가 올라간다는 발상.
+    # 실측 반박: analyze_combos.py 기준 common_trend 20일 선정력 −0.20%(t=−0.20)로,
+    # 겹치기 전 stage2 단독 +1.92%보다 나쁘다. 게이트는 유지하되 근거 없음을 화면에 표기했다.
     # 구성 패턴이 1개뿐인 카테고리에 "2개 이상"을 요구하면 영원히 비어 있으므로 개수에 맞춘다.
     for name, keys, hits_col, score_col in [
         ("common_trend", TREND_PATTERN_KEYS,  "trend_hits",  "trend_score"),

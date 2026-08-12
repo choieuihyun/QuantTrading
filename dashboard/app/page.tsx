@@ -26,8 +26,8 @@ const GROUPS = [
 type GroupKey = (typeof GROUPS)[number]["key"];
 
 const PATTERNS: { key: PatternKey; group: GroupKey; label: string; desc: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { key: "common_trend", group: "common", label: "★ 추세 공통",  desc: "Stage2 + CAN SLIM + Darvas 중 2개+ — 신고가형 상승 추세", icon: Trophy,  color: "text-yellow-400",  bg: "bg-yellow-500/10" },
-  { key: "common_accum", group: "common", label: "★ 매집 공통",  desc: "Wyckoff + VCP 둘 다 해당 — 조정/매집 완료 폭발 직전",  icon: Eye,     color: "text-rose-300",    bg: "bg-rose-500/10" },
+  { key: "common_trend", group: "common", label: "★ 돌파 공통",  desc: "Stage2 + CAN SLIM + Darvas + VCP 중 2개+ — 겹침 이득은 실측 안 됨", icon: Trophy,  color: "text-yellow-400",  bg: "bg-yellow-500/10" },
+  { key: "common_accum", group: "common", label: "★ 매집 공통",  desc: "Wyckoff 단독 — 횡보 매집 확인형",                    icon: Eye,     color: "text-rose-300",    bg: "bg-rose-500/10" },
   { key: "common_all",   group: "common", label: "☆ 내 패턴 공통", desc: "정배열매집 + 5일선추세 + 눌림목 중 2개+ — 참고용",  icon: Star,    color: "text-white/50",    bg: "bg-white/5" },
   { key: "canslim", group: "legend", label: "CAN SLIM",         desc: "O'Neil — 52주 신고가 + 거래량 폭발 + 상대강도",       icon: Star,      color: "text-blue-400",    bg: "bg-blue-500/10" },
   { key: "vcp",     group: "legend", label: "VCP",              desc: "Minervini — 변동성 수축 후 돌파 직전",                icon: Zap,       color: "text-purple-400",  bg: "bg-purple-500/10" },

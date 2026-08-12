@@ -42,8 +42,8 @@ const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
 ];
 
 const CAT_META: Record<string, { label: string; color: string; desc: string }> = {
-  common_trend: { label: "추세 공통",  color: "#facc15", desc: "Stage2 + CAN SLIM + Darvas" },
-  common_accum: { label: "매집 공통",  color: "#fb7185", desc: "Wyckoff + VCP" },
+  common_trend: { label: "돌파 공통",  color: "#facc15", desc: "Stage2 + CAN SLIM + Darvas + VCP 중 2개+" },
+  common_accum: { label: "매집 공통",  color: "#fb7185", desc: "Wyckoff 단독" },
   common_all:   { label: "내 패턴 공통", color: "#94a3b8", desc: "P1 + P2 + P3" },
 };
 
