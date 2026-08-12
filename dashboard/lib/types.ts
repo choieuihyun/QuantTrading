@@ -17,6 +17,8 @@ export interface Stock {
   avg_value_20?: number;
   momentum_3m: number;
   rs?: number;
+  /** IBD 방식 RS Rating(1~99) — 유니버스 백분위. O'Neil의 L 기준은 70 이상 */
+  rs_rating?: number;
   pos_52w?: number;
   score: number;
   // P1
@@ -33,14 +35,38 @@ export interface Stock {
   in_fib_zone?: boolean;
   above_ma20?: boolean;
   today_bullish?: boolean;
-  // Stage2
+  // Stage2 (Weinstein) — 30주선(=150일선) + 베이스 저항 돌파
   ma120_rising?: boolean;
   above_ma120_days?: number;
-  // VCP
+  ma150?: number;
+  ma150_rising?: boolean;
+  range_high?: number | null;
+  range_low?: number | null;
+  base_breakout?: boolean;
+  /** 돌파 봉의 거래량 배수 — Weinstein은 평균 2배 이상 요구 */
+  breakout_vol?: number;
+  // VCP (Minervini) — Trend Template + 연속 수축
   vol_contracting?: boolean;
   partial_aligned?: boolean;
+  /** Trend Template 7개 충족 (8번 RS Rating은 별도) */
+  tt_ok?: boolean;
+  vcp_legs?: number;
+  vcp_last_depth?: number | null;
+  vcp_pivot?: number | null;
+  vcp_above_pivot?: boolean;
+  // Darvas — 박스 천장/바닥. 손절은 ATR이 아니라 박스 바닥
+  box_top?: number | null;
+  box_bottom?: number | null;
+  stop_box?: number | null;
+  box_bars?: number;
+  // Wyckoff — 구조적으로 확인 가능한 부분만
+  wyckoff_spring?: boolean;
+  wyckoff_sos?: boolean;
+  wyckoff_vol_dry?: boolean;
   // CAN SLIM / Darvas
   near_52w_high?: boolean;
+  /** CAN SLIM M — 벤치마크가 자기 200일선 위 + 우상향 */
+  market_uptrend?: boolean;
   // Common
   pattern_hits?: number;
   // DART 펀더멘털 (KR만)

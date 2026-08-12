@@ -12,10 +12,10 @@ KR_CONFIG = {
     "currency":        "KRW",
 
     # ── 데이터 기간 ───────────────────────────────────────
-    "data_days":       480,               # lookback_bars(300봉)를 휴장일 포함해도 확보
+    "data_days":       600,               # lookback_bars(400봉)를 휴장일 포함해도 확보
     "bt_days":         1100,              # 백테스트 스캔 구간 확보
     "bars_per_year":   252,               # pos_52w 계산 기준 봉 수
-    "lookback_bars":   300,               # 신호 계산에 쓰는 봉 수 — 라이브/재현 공통
+    "lookback_bars":   400,               # MA200 기울기(221봉)+RS 4분기(253봉) 수용
     "drop_partial_bar": False,            # 장 마감 후 실행 → 완성봉
 
     # ── 유동성 / 거래가능성 ───────────────────────────────
@@ -53,10 +53,10 @@ US_CONFIG = {
     "skip_weekends":   True,
     "currency":        "USD",
 
-    "data_days":       480,
+    "data_days":       600,
     "bt_days":         1100,
     "bars_per_year":   252,
-    "lookback_bars":   300,
+    "lookback_bars":   400,
     "drop_partial_bar": False,
 
     "min_trading_value": 10_000_000,      # 20일 평균 거래대금 $10M
@@ -91,10 +91,10 @@ CRYPTO_CONFIG = {
     "skip_weekends":   False,             # 24/7 시장
     "currency":        "USD",
 
-    "data_days":       500,               # 24/7이라 1년 = 365봉
+    "data_days":       700,               # 24/7이라 1년 = 365봉
     "bt_days":         1100,
     "bars_per_year":   365,
-    "lookback_bars":   420,               # 365봉(1년) + 여유
+    "lookback_bars":   560,               # 365봉(1년) + MA200 기울기 여유
     "drop_partial_bar": True,             # 진행 중인 당일 봉은 거래량이 미완성
 
     "min_trading_value": 50_000_000,      # 20일 평균 거래대금 $50M

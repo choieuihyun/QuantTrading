@@ -28,6 +28,7 @@ def _is_trend_signal(s: dict, cfg: dict) -> bool:
 
 
 def _is_accum_signal(s: dict, cfg: dict) -> bool:
+    """매집형 구성 패턴 전부 충족 (현재 wyckoff 1개)"""
     t = cfg.get("score_threshold", SCORE_THRESHOLD)
     return all(score_pattern(k, s, cfg) >= t for k in ACCUM_PATTERN_KEYS)
 

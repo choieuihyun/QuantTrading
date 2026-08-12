@@ -22,6 +22,25 @@ PATTERN_NAMES = {
 }
 
 
+CANSLIM_C_POINTS = 15   # 현분기 EPS +25% 충족 시 가산
+
+
+def _apply_canslim_c(key: str, df):
+    """
+    CAN SLIM의 C(현분기 EPS +25%)를 점수에 반영.
+
+    DART는 유니버스 전체가 아니라 '선정된 종목'만 조회하므로 선정 단계에서는 C를 쓸 수 없다.
+    기술적 조건(N/S/L/M)으로 후보를 고른 뒤 여기서 C를 얹는 2단계 구조다.
+    가산만 하고 감점하지 않으므로 후보 자체가 줄어들지는 않는다.
+    """
+    if key != "canslim" or "canslim_c" not in df.columns or "score" not in df.columns:
+        return df
+    bonus = df["canslim_c"].fillna(False).astype(bool) * CANSLIM_C_POINTS
+    df = df.copy()
+    df["score"] = (df["score"] + bonus).clip(upper=100)
+    return df.sort_values("score", ascending=False).reset_index(drop=True)
+
+
 def main():
     run_type = sys.argv[1] if len(sys.argv) > 1 else "auto"
     print(f"Running screener [{run_type}]...")
@@ -47,7 +66,7 @@ def main():
                 for key, df in results.items():
                     if hasattr(df, "empty") and not df.empty:
                         merged = df.merge(dart_data, on="ticker", how="left")
-                        results[key] = dart_fetcher.add_valuation(merged)
+                        results[key] = _apply_canslim_c(key, dart_fetcher.add_valuation(merged))
                 # 분기 재무 히스토리는 별도 컬렉션으로 저장 (재고 사이클/차트용)
                 firebase_upload.save_fundamentals(histories)
 

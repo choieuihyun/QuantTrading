@@ -28,6 +28,7 @@ import FinanceDataReader as fdr
 
 from screener import (
     calc_signals_from_df, drop_partial_bar, sanitize_ohlc, get_universe, score_pattern,
+    attach_rs_rating,
     ALL_PATTERN_KEYS, TREND_PATTERN_KEYS, ACCUM_PATTERN_KEYS, CUSTOM_PATTERN_KEYS,
     SCORE_THRESHOLD, _last_weekday,
 )
@@ -38,10 +39,11 @@ HORIZONS  = [5, 20, 60]
 STOP_KEY  = {5: "stop_swing", 20: "stop_swing", 60: "stop_lt"}
 
 # 공통 카테고리 — 구성 패턴 중 몇 개 이상이면 편입인지
+# 구성 패턴이 1개뿐인 카테고리에 "2개 이상"을 요구하면 영원히 비어 있게 된다
 COMMON_SPECS = {
-    "common_trend": (TREND_PATTERN_KEYS,  2),
-    "common_accum": (ACCUM_PATTERN_KEYS,  2),
-    "common_all":   (CUSTOM_PATTERN_KEYS, 2),
+    "common_trend": (TREND_PATTERN_KEYS,  min(2, len(TREND_PATTERN_KEYS))),
+    "common_accum": (ACCUM_PATTERN_KEYS,  min(2, len(ACCUM_PATTERN_KEYS))),
+    "common_all":   (CUSTOM_PATTERN_KEYS, min(2, len(CUSTOM_PATTERN_KEYS))),
 }
 EVAL_KEYS = ALL_PATTERN_KEYS + list(COMMON_SPECS)
 
@@ -203,7 +205,8 @@ def _net_return(entry: float, exit_price: float, cfg: dict) -> float:
 
 
 def _scan_ticker(row: dict, hist: pd.DataFrame, scan_dates: pd.DatetimeIndex,
-                 bench_ret: pd.Series, cfg: dict, still_listed: bool) -> list[dict]:
+                 bench_ret: pd.Series, cfg: dict, still_listed: bool,
+                 bench_up: pd.Series = None) -> list[dict]:
     lookback = cfg.get("lookback_bars", 300)
     min_value = cfg.get("min_trading_value") or 0
 
@@ -223,8 +226,10 @@ def _scan_ticker(row: dict, hist: pd.DataFrame, scan_dates: pd.DatetimeIndex,
         if mr is None or not np.isfinite(mr):
             continue
 
+        up = True if bench_up is None else bool(bench_up.get(date, True))
         window  = hist.iloc[pos + 1 - lookback : pos + 1]
-        signals = calc_signals_from_df(window, market_return=float(mr), cfg=cfg)
+        signals = calc_signals_from_df(window, market_return=float(mr), cfg=cfg,
+                                       market_uptrend=up)
         if signals is None:
             continue
 
@@ -256,6 +261,11 @@ def build(market_key: str, days: int, scan_interval: int, sample: int | None) ->
     mbars = 65 if cfg["type"] != "CRYPTO" else 90
     bench_ret = (bench["Close"] / bench["Close"].shift(mbars) - 1).round(4)
 
+    # CAN SLIM의 M — 각 스캔일 시점의 시장 방향 (그날까지의 데이터만 사용)
+    bc = bench["Close"]
+    bma200 = bc.rolling(200).mean()
+    bench_up = (bc > bma200) & (bma200 > bma200.shift(21))
+
     universe = pit_universe(cfg, start_date)
     if sample:
         universe = universe.sample(min(sample, len(universe)), random_state=42)
@@ -273,7 +283,7 @@ def build(market_key: str, days: int, scan_interval: int, sample: int | None) ->
         if hist is None or len(hist) <= lookback:
             return []
         still_listed = hist.index[-1] >= max_date - pd.Timedelta(days=5)
-        return _scan_ticker(row, hist, scan_dates, bench_ret, cfg, still_listed)
+        return _scan_ticker(row, hist, scan_dates, bench_ret, cfg, still_listed, bench_up)
 
     all_rows, done = [], 0
     with ThreadPoolExecutor(max_workers=16) as ex:
@@ -287,6 +297,12 @@ def build(market_key: str, days: int, scan_interval: int, sample: int | None) ->
         raise RuntimeError("적재된 행이 없습니다 — 기간/유니버스 확인 필요")
 
     panel = pd.DataFrame(all_rows)
+
+    # RS Rating은 날짜별 유니버스 백분위 — 라이브가 거래가능 종목을 모집단으로 쓰므로 동일하게 맞춘다
+    panel = (panel[panel["is_tradable"]]
+             .groupby("date", group_keys=False)
+             .apply(attach_rs_rating, include_groups=True)
+             .reset_index(drop=True))
 
     # 벤치마크 수익률을 동일 창(다음날 시가 → h일 뒤 종가)으로 붙여 초과수익을 비교 가능하게 만듦
     bidx = bench.index
@@ -771,7 +787,8 @@ def verify(market_key: str, n: int = 15) -> int:
             hist = sanitize_ohlc(drop_partial_bar(fdr.DataReader(t, start), cfg))
         except Exception:
             continue
-        if hist.empty or len(hist) < cfg["lookback_bars"] * 2:
+        # 자르는 창(lookback)과 전체 히스토리 사이에 충분한 차이가 있어야 창 의존성이 드러난다
+        if hist.empty or len(hist) < cfg["lookback_bars"] + 200:
             continue
         s1 = calc_signals_from_df(hist, cfg=cfg)
         s2 = calc_signals_from_df(hist, cfg=full)

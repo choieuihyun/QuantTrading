@@ -45,74 +45,101 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   },
   canslim: {
     title: "CAN SLIM",
-    author: "William O'Neil — IBD 창시자, 수십 년간 텐배거 발굴 방법론",
-    tagline: "52주 신고가 + 거래량 폭발 + 상대강도 + EPS 성장",
+    author: "William O'Neil — IBD 창시자",
+    tagline: "신고가 + 거래량 + RS Rating 70↑ + 상승장에서만 매수",
+    concept:
+      "원전 7개 조건 중 N·S·L·M 4개를 구현했습니다.\n" +
+      "L(주도주)은 IBD 방식 RS Rating — 코스피 대비 초과수익이 아니라 전 종목 백분위입니다.",
     conditions: [
       { cond: "N — 신고가 근처", ind: "pos_52w", crit: "0.75 이상 (52주 고점 25% 이내)" },
-      { cond: "S — 거래량 급증", ind: "vol_ratio", crit: "2배 이상" },
-      { cond: "L — 시장 아웃퍼폼", ind: "rs", crit: "+5% 이상" },
-      { cond: "M — 정배열", ind: "full_aligned", crit: "MA5 > MA20 > MA60 > MA120" },
-      { cond: "C — EPS 성장 (DART)", ind: "canslim_c", crit: "전년 동기 대비 25%↑" },
+      { cond: "S — 거래량 급증", ind: "vol_ratio", crit: "20일 평균 2배 이상" },
+      { cond: "L — 주도주", ind: "rs_rating", crit: "유니버스 백분위 70 이상 (IBD 기준)" },
+      { cond: "M — 시장 방향", ind: "market_uptrend", crit: "지수가 자기 200일선 위 + 우상향" },
+      { cond: "C — 현분기 EPS", ind: "canslim_c", crit: "전년 동기 대비 25%↑ (선정 후 가산 15점)" },
     ],
-    scoring: "신고가 근처 25 / 거래량 급증 30 / 상대강도 25 / 정배열 15 / RSI 5",
-    note: "미구현: A(연간 EPS 3년 연속 25%↑), I(기관 신규 매수)",
+    scoring: "N 25 / L 30 / S 20 / M 15 / 추세건전성 10  → C 충족 시 +15",
+    note:
+      "⚠️ 미구현 — A(3년 연속 이익 증가): DART가 약 2년치만 제공. " +
+      "I(기관 신규 매수): 외인·기관 순매수 데이터 미연동. " +
+      "C는 유니버스 전체 재무를 못 받아 선정 단계가 아닌 사후 가산으로만 반영됩니다.",
   },
   vcp: {
     title: "VCP",
-    author: "Mark Minervini — US 투자 챔피언십 우승, 연 200%+ 수익률",
-    tagline: "변동성 수축 후 돌파 직전 (Volatility Contraction Pattern)",
+    author: "Mark Minervini — US 투자 챔피언십 우승",
+    tagline: "조정이 연속으로 얕아지는 수축 + Trend Template 통과",
     concept:
-      "큰 조정(-30%) → 중간 조정(-20%) → 작은 조정(-10%) → 수축 완료 → 돌파\n거래량도 같이 수축 → 매물 소화 완료 신호",
+      "큰 조정 → 중간 조정 → 작은 조정으로 '점점 얕아지는' 연속성이 VCP의 정체성입니다.\n" +
+      "단순히 '지금 변동성이 낮다'는 것과 다릅니다.\n" +
+      "Minervini Trend Template 8개를 먼저 통과해야 후보가 됩니다.",
     conditions: [
-      { cond: "변동성 수축", ind: "bb_squeeze", crit: "볼린저 밴드 25% 이하 분위" },
-      { cond: "조정 범위", ind: "pullback_pct", crit: "-10% ~ -30%" },
-      { cond: "거래량 수축", ind: "vol_contracting", crit: "5일 평균 < 20일 평균 80%" },
-      { cond: "정배열 유지", ind: "partial_aligned", crit: "MA5 > MA20 > MA60" },
-      { cond: "매도세 없음", ind: "obv_rising", crit: "OBV 20일 전보다 높음" },
+      { cond: "Trend Template", ind: "tt_ok", crit: "50/150/200일선 정렬·200일선 우상향·52주 저점 30%↑·고점 25% 이내" },
+      { cond: "주도주", ind: "rs_rating", crit: "70 이상 (Trend Template 8번)" },
+      { cond: "수축 횟수", ind: "vcp_legs", crit: "2회 이상 (교과서 2~5회)" },
+      { cond: "점점 얕아짐", ind: "vcp_tightening", crit: "각 조정이 직전보다 작음" },
+      { cond: "거래량 감소", ind: "vcp_vol_declining", crit: "수축마다 평균 거래량 감소" },
+      { cond: "피벗 돌파", ind: "vcp_above_pivot", crit: "마지막 수축 고점 상향" },
     ],
-    scoring: "볼린저 수축 30 / 조정 범위 20 / 거래량 수축 15 / 정배열 20 / OBV 15",
+    scoring: "점점 얕아짐 30 / 수축 3회↑ 15 / 거래량 감소 20 / 마지막 수축 타이트 20 / 피벗 돌파 15",
+    note:
+      "근사 — 스윙 고·저점을 좌우 5봉 기준으로 잡고 최근 90봉에서 수축을 찾습니다. " +
+      "'어느 스윙을 한 번의 수축으로 셀지'는 원전에 수치가 없어 임의로 정한 부분입니다.",
   },
   stage2: {
     title: "Stage 2",
-    author: "Stan Weinstein — 4단계 이론, 수십 년 시장 사이클 분석",
-    tagline: "MA120 위 + 우상향 안정 추세 (상승 추세 진입 구간)",
+    author: "Stan Weinstein — 4단계 이론",
+    tagline: "30주선 위 + 우상향 + 베이스 저항을 거래량 동반 돌파",
     concept:
-      "Stage 1: 횡보(바닥 다지기) → 관망\nStage 2: 상승 추세 진입 → ★ 매수 구간\nStage 3: 천장 횡보 → 매도 준비\nStage 4: 하락 → 절대 매수 금지",
+      "Stage 1: 횡보(바닥) → Stage 2: 상승 전환 ★매수 → Stage 3: 천장 → Stage 4: 하락\n" +
+      "핵심은 '이미 오르는 상태'가 아니라 베이스 저항을 뚫는 '전환 시점'입니다.",
     conditions: [
-      { cond: "MA120(200) 위", ind: "price > ma120", crit: "현재가 > MA120" },
-      { cond: "MA120 우상향", ind: "ma120_rising", crit: "현재 MA120 > 20일 전 MA120" },
-      { cond: "Stage 2 안정 유지", ind: "above_ma120_days", crit: "최근 20일 중 15일 이상 MA120 위" },
-      { cond: "정배열", ind: "partial_aligned", crit: "MA5 > MA20 > MA60" },
-      { cond: "시장 아웃퍼폼", ind: "rs", crit: "RS > 0" },
+      { cond: "30주선 위", ind: "price > ma150", crit: "현재가 > 150일선 (30주 ≈ 150거래일)" },
+      { cond: "30주선 우상향", ind: "ma150_rising", crit: "21거래일 전보다 높음" },
+      { cond: "베이스 저항 돌파", ind: "base_breakout", crit: "횡보 구간 상단 상향 (최근 10봉 내 인정)" },
+      { cond: "돌파 거래량", ind: "breakout_vol", crit: "돌파 봉 거래량 평균 2배 이상" },
+      { cond: "주도주", ind: "rs_rating", crit: "70 이상 우대" },
     ],
-    scoring: "MA120 위 25 / MA120 우상향 25 / 유지 기간 15 / 정배열 20 / RS 15",
+    scoring: "30주선 위 20 / 우상향 20 / 돌파 20 / 돌파 거래량 20 / RS 12 / 200일선 위 8",
+    note:
+      "근사 — 원전은 주봉 30주선입니다. 여기서는 일봉 150선으로 대체했습니다(30주 = 150거래일). " +
+      "베이스는 최근 최대 120봉 중 폭 30% 이내로 횡보한 구간을 자동 인식합니다.",
   },
   wyckoff: {
     title: "Wyckoff 매집",
-    author: "Richard Wyckoff — 100년 전 제시, 스마트머니 추적의 바이블",
-    tagline: "OBV 신고점 = 스마트머니가 조용히 매수 중",
+    author: "Richard Wyckoff — 스마트머니 추적의 원류",
+    tagline: "거래범위 안에서 Spring 또는 SOS + 하락일 거래량 소진",
     concept:
-      "PS(예비 지지) → SC(매도 절정) → AR(자동 반등) → ST(2차 테스트)\n→ Spring(최후 흔들기) → LPS(마지막 지지점) → SOS(강도 표시) → 상승",
+      "PS → SC(매도절정) → AR → ST → Spring(최후 흔들기) → LPS → SOS(강도 표시) → 상승\n" +
+      "이 중 구조로 확인 가능한 Spring·SOS·거래량 소진만 구현했습니다.",
     conditions: [
-      { cond: "스마트머니 매집", ind: "obv_new_high", crit: "OBV 60일 최고점 98% 이상" },
-      { cond: "OBV 상승 추세", ind: "obv_rising", crit: "OBV 20일 전보다 높음" },
-      { cond: "Spring 후 수축", ind: "bb_squeeze", crit: "볼린저 수축 구간" },
-      { cond: "매수 압력", ind: "bullish_ratio", crit: "최근 20일 양봉 65% 이상" },
-      { cond: "MA 위 위치", ind: "price > ma20", crit: "현재가 > MA20" },
+      { cond: "거래범위 존재", ind: "range_high/low", crit: "폭 30% 이내로 20봉 이상 횡보" },
+      { cond: "Spring", ind: "wyckoff_spring", crit: "하단을 저가로 이탈했다가 종가 회복" },
+      { cond: "SOS", ind: "wyckoff_sos", crit: "거래량 2배 동반 상단 돌파" },
+      { cond: "매도 소진", ind: "wyckoff_vol_dry", crit: "하락일 평균 거래량 < 상승일" },
+      { cond: "OBV 상승", ind: "obv_rising", crit: "20일 전보다 높음" },
     ],
-    scoring: "OBV 신고점 35 / OBV 상승 20 / 볼린저 수축 20 / 양봉 비율 15 / MA 위치 10",
+    scoring: "Spring 30 / SOS 30 / 매도 소진 20 / OBV 상승 12 / OBV 신고점 8",
+    note:
+      "⚠️ 부분 구현 — 국면(Phase A~E) 판정과 SC/AR/ST 식별은 거래량-스프레드 재량 해석이라 " +
+      "코드로 옮기지 않았습니다. 'Wyckoff 방법론'이 아니라 그중 기계적으로 확인 가능한 일부입니다.",
   },
   darvas: {
     title: "Darvas Box",
-    author: "Nicolas Darvas — 댄서 출신, 2년 만에 200만 달러 수익",
-    tagline: "신고가 박스권 돌파 + 거래량 폭발",
-    concept: "신고가 경신 → 일정 기간 박스권 형성 → 거래량 폭발과 함께 상단 돌파 → 매수",
+    author: "Nicolas Darvas — 2년 만에 200만 달러",
+    tagline: "박스 천장 돌파 + 거래량. 손절은 박스 바닥",
+    concept:
+      "신고가가 3봉 동안 경신되지 않으면 그 고가가 박스 천장.\n" +
+      "이후 최저가가 3봉을 버티면 박스 바닥. 천장을 종가로 넘으면 매수.",
     conditions: [
-      { cond: "52주 신고가 근처", ind: "pos_52w", crit: "0.80 이상 (박스 상단 돌파 직후)" },
-      { cond: "거래량 폭발", ind: "vol_ratio", crit: "2배 이상" },
-      { cond: "강한 모멘텀", ind: "momentum_3m", crit: "15% 이상" },
+      { cond: "박스 천장 확정", ind: "box_top", crit: "신고가가 3봉간 미경신" },
+      { cond: "박스 바닥 확정", ind: "box_bottom", crit: "이후 최저가가 3봉간 미이탈" },
+      { cond: "박스 폭", ind: "box_top/bottom", crit: "25% 이내 (넘으면 횡보가 아닌 추세)" },
+      { cond: "천장 돌파", ind: "box_breakout", crit: "종가 > 박스 천장" },
+      { cond: "거래량", ind: "vol_ratio", crit: "20일 평균 2배 이상" },
     ],
-    scoring: "52주 위치 35 / 거래량 폭발 40 / 모멘텀 25",
+    scoring: "천장 돌파 35 / 거래량 25 / 박스 폭 20 / 52주 위치 20",
+    note:
+      "손절은 ATR이 아니라 박스 바닥(stop_box)을 씁니다 — 원전 규칙입니다. " +
+      "박스 폭 상한 25%는 원전에 수치가 없어 임의로 정했습니다(하락 추세 전체가 박스로 잡히는 것 방지).",
   },
   p1: {
     title: "정배열 퍼지기 직전 + 매집",
