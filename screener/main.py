@@ -51,11 +51,13 @@ def main():
     all_market_results = {}
     all_prices = {}
     all_names = {}
+    all_meta = {}
 
     for market_key, cfg in configs.items():
-        results, prices, names = screener.run(cfg)
+        results, prices, names, meta = screener.run(cfg)
         all_prices[market_key] = prices
         all_names[market_key] = names
+        all_meta[market_key] = meta
 
         # DART 펀더멘털 보강 (KR만)
         if market_key == "kr" and os.environ.get("DART_API_KEY"):
@@ -104,7 +106,7 @@ def main():
     firebase_upload.save_scorecard(scorecards)
     # 가상 매매 평가용 — 보유 종목이 패턴 목록에서 빠져도 현재가를 알 수 있어야 한다
     try:
-        firebase_upload.save_prices(all_prices, all_names)
+        firebase_upload.save_prices(all_prices, all_names, all_meta)
     except Exception as e:
         print(f"  시세 업로드 실패: {e}")
 

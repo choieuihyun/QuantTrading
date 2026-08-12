@@ -282,6 +282,9 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         stop_lt    = round(price_now - 2.5 * atr_14, nd)   # 장투 손절 (-2.5 ATR)
 
         return {
+            # 시계가 아니라 데이터의 마지막 봉 날짜. UTC 러너에서 08:30 KST 실행 시
+            # datetime.today()가 실제 시세 날짜와 최대 이틀까지 어긋난다(월요일 아침).
+            "bar_date":           str(hist.index[-1].date()),
             "price":              price_now,
             "ma5":                round(ma5_v, nd),
             "ma20":               round(ma20_v, nd),
@@ -818,4 +821,7 @@ def run(cfg: dict = None) -> dict:
     prices = {str(t): float(p) for t, p in zip(all_df["ticker"], all_df["price"])}
     # 가상 매매에서 종목을 검색해 담으려면 코드만으로는 부족하다.
     names = {str(t): str(n) for t, n in zip(all_df["ticker"], all_df["name"])}
-    return output, prices, names
+    # 종목마다 상장·거래정지로 마지막 봉이 다를 수 있어 최빈값을 시장 기준일로 쓴다
+    bar_date = all_df["bar_date"].mode()
+    meta = {"bar_date": str(bar_date.iloc[0]) if len(bar_date) else None}
+    return output, prices, names, meta

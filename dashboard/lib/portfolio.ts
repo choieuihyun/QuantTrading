@@ -12,6 +12,31 @@ import type { MarketKey, PatternKey, Position } from "./types";
 
 const KEY = "qt.portfolio.v1";
 
+/**
+ * 왕복 거래비용 — screener/market_config.py와 같은 값이어야 한다.
+ * 성적표·3년치 통계는 비용을 뺀 수익률을 보여준다. 여기만 세전으로 두면
+ * 두 화면 숫자를 나란히 놓고 잘못 비교하게 된다.
+ */
+const COST: Record<MarketKey, { fee: number; tax: number; slip: number }> = {
+  kr:     { fee: 0.00015, tax: 0.0018, slip: 0.001  },
+  us:     { fee: 0,       tax: 0,      slip: 0.0005 },
+  crypto: { fee: 0.001,   tax: 0,      slip: 0.002  },
+};
+
+/** 진입가는 비용만큼 비싸게, 청산가는 비용만큼 싸게 친다 (replay._forward_outcomes와 동일) */
+function afterCost(market: MarketKey, entry: number, exit: number) {
+  const c = COST[market] ?? COST.kr;
+  return {
+    entry: entry * (1 + c.fee + c.slip),
+    exit: exit * (1 - c.fee - c.slip - c.tax),
+  };
+}
+
+export function roundTripCost(market: MarketKey): number {
+  const c = COST[market] ?? COST.kr;
+  return 2 * (c.fee + c.slip) + c.tax;
+}
+
 function isPosition(v: unknown): v is Position {
   if (!v || typeof v !== "object") return false;
   const p = v as Record<string, unknown>;
@@ -51,9 +76,11 @@ export function newId(): string {
 export interface Valued extends Position {
   /** 평가에 쓴 현재가. 시세에 없으면 null */
   nowPrice: number | null;
-  /** 청산했으면 청산가 기준, 아니면 현재가 기준 */
+  /** 왕복 거래비용을 뺀 수익률 — 성적표·통계 화면과 같은 기준 */
   pnlPct: number | null;
   pnlAmount: number | null;
+  /** 비용 반영 전. 두 값의 차이가 곧 비용이다 */
+  grossPct: number | null;
   cost: number;
   value: number | null;
   heldDays: number;
@@ -70,14 +97,22 @@ export function valuePosition(p: Position, prices: Record<string, number>): Valu
     0,
     Math.round((end.getTime() - new Date(p.entryDate).getTime()) / 86_400_000)
   );
+  let pnlPct: number | null = null;
+  let pnlAmount: number | null = null;
+  if (mark !== null && p.entryPrice > 0) {
+    const eff = afterCost(p.market, p.entryPrice, mark);
+    pnlPct = (eff.exit - eff.entry) / eff.entry;
+    pnlAmount = pnlPct * cost;
+  }
   return {
     ...p,
     closed,
     nowPrice: mark,
     cost,
     value,
-    pnlPct: mark === null || p.entryPrice <= 0 ? null : (mark - p.entryPrice) / p.entryPrice,
-    pnlAmount: value === null ? null : value - cost,
+    pnlPct,
+    pnlAmount,
+    grossPct: mark === null || p.entryPrice <= 0 ? null : (mark - p.entryPrice) / p.entryPrice,
     heldDays,
   };
 }
@@ -94,19 +129,46 @@ export interface Totals {
 }
 
 export function totals(rows: Valued[]): Totals {
-  let cost = 0, value = 0, unpriced = 0, wins = 0, losses = 0;
+  let cost = 0, pnlAmount = 0, unpriced = 0, wins = 0, losses = 0;
   for (const r of rows) {
-    if (r.value === null) { unpriced += 1; continue; }
+    if (r.pnlAmount === null) { unpriced += 1; continue; }
     cost += r.cost;
-    value += r.value;
+    pnlAmount += r.pnlAmount;
     if (r.pnlPct !== null && r.pnlPct > 0) wins += 1;
     else if (r.pnlPct !== null && r.pnlPct < 0) losses += 1;
   }
   return {
-    cost, value, unpriced, wins, losses,
-    pnlAmount: value - cost,
-    pnlPct: cost > 0 ? (value - cost) / cost : null,
+    cost, unpriced, wins, losses, pnlAmount,
+    value: cost + pnlAmount,
+    pnlPct: cost > 0 ? pnlAmount / cost : null,
   };
+}
+
+/** 어느 패턴에서 담은 게 실제로 나았는지 — 이 화면의 존재 이유 */
+export interface PatternRoll {
+  pattern: string;
+  n: number;
+  wins: number;
+  avgPct: number;
+  totalPnl: number;
+}
+
+export function byPattern(rows: Valued[]): PatternRoll[] {
+  const g = new Map<string, Valued[]>();
+  for (const r of rows) {
+    if (r.pnlPct === null) continue;
+    const k = r.pattern ?? "(미지정)";
+    (g.get(k) ?? g.set(k, []).get(k)!).push(r);
+  }
+  return [...g.entries()]
+    .map(([pattern, rs]) => ({
+      pattern,
+      n: rs.length,
+      wins: rs.filter((r) => r.pnlPct! > 0).length,
+      avgPct: rs.reduce((s, r) => s + r.pnlPct!, 0) / rs.length,
+      totalPnl: rs.reduce((s, r) => s + (r.pnlAmount ?? 0), 0),
+    }))
+    .sort((a, b) => b.avgPct - a.avgPct);
 }
 
 export function add(

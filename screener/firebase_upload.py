@@ -127,27 +127,28 @@ def save_scorecard(scorecards: dict):
     print(f"Uploaded → scorecard/* ({n}개 문서)")
 
 
-def save_prices(price_maps: dict, names: dict = None):
+def save_prices(price_maps: dict, names: dict = None, meta: dict = None):
     """
     유니버스 전 종목 시세 — 가상 매매 평가용.
 
     패턴 목록에는 20종목만 담기므로, 산 종목이 다음날 목록에서 빠지면 현재가를 알 수 없다.
     스크리너가 이미 받아둔 전 종목 시세를 그대로 올려 그 구멍을 막는다.
 
-    market_date를 함께 박는다 — 실행이 실패해 문서가 하루 묵으면 어제 값이 '현재가'로
-    조용히 표시되는 게 최악이라, 화면에서 기준일을 같이 보여줄 수 있어야 한다.
+    기준일은 시계가 아니라 데이터의 마지막 봉 날짜(bar_date)를 쓴다. 08:30 KST 실행이
+    UTC로는 전날 23:30이라 datetime.today()는 실제 시세 날짜와 어긋난다(월요일 아침은 이틀).
+    묵은 시세가 '현재가'로 조용히 표시되는 게 최악이라 화면에 이 날짜를 같이 보여준다.
     """
     if not price_maps:
         return
     _init_app()
     db = firestore.client()
 
-    market_date = datetime.today().strftime("%Y-%m-%d")
+    fallback = datetime.today().strftime("%Y-%m-%d")
     for market, prices in price_maps.items():
         if not prices:
             continue
         db.collection("prices").document(market).set({
-            "market_date": market_date,
+            "market_date": ((meta or {}).get(market) or {}).get("bar_date") or fallback,
             "run_at": datetime.now(timezone.utc),
             "count": len(prices),
             "prices": {str(t): float(p) for t, p in prices.items()},

@@ -45,8 +45,9 @@ function tone(v: number | null) {
   return v > 0 ? "text-rose-400" : v < 0 ? "text-blue-400" : "text-white/60";
 }
 
+/** toISOString은 UTC라 KST 오전 0~9시에 하루 밀린다. 진입일이 밀리면 기록 자체가 틀어진다. */
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("sv-SE");
 }
 
 export default function PortfolioPage() {
@@ -116,10 +117,13 @@ export default function PortfolioPage() {
         ) : isLoading || !ready ? (
           <Skeleton className="h-64 w-full" />
         ) : !data ? (
-          <DataError err={new Error("prices 문서가 없습니다")} collection="prices" />
+          <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-white/45">
+            이 시장의 시세가 아직 없습니다. 스크리너를 <b className="text-white/70">{market}</b> 시장으로
+            한 번 돌리면 채워집니다 (읽기 권한 문제가 아니라 데이터가 없는 상태입니다).
+          </div>
         ) : (
           <>
-            <PriceStamp date={data.market_date} count={data.count} />
+            <PriceStamp date={data.market_date} count={data.count} market={market} />
 
             <AddForm
               market={market}
@@ -170,6 +174,8 @@ export default function PortfolioPage() {
               </div>
             )}
 
+            <PatternRollup rows={rows} unit={unit} />
+
             <Backup positions={positions} onReplace={commit} />
           </>
         )}
@@ -190,13 +196,18 @@ function StorageNotice() {
   );
 }
 
-function PriceStamp({ date, count }: { date: string; count: number }) {
-  const stale = date < today();
+function PriceStamp({ date, count, market }: { date: string; count: number; market: MarketKey }) {
+  // 주말·공휴일에도 경고가 뜨면 경고를 무시하게 된다 — 거래일 기준 3일 넘게 묵었을 때만 띄운다
+  const ageDays = Math.floor(
+    (new Date(today()).getTime() - new Date(date).getTime()) / 86_400_000
+  );
+  const stale = ageDays > 4;
   return (
     <p className="text-xs text-white/40">
       평가 기준 <b className={stale ? "text-amber-300" : "text-white/70"}>{date}</b> 종가
-      · {count.toLocaleString()}종목
-      {stale && " — 오늘 스크리너가 아직 돌지 않았습니다. 실시간 가격이 아닙니다."}
+      · {count.toLocaleString()}종목 · 실시간 아님 · 수익률은 왕복 거래비용{" "}
+      {(pf.roundTripCost(market) * 100).toFixed(2)}% 반영(성적표·통계와 같은 기준)
+      {stale && ` — ${ageDays}일 묵었습니다. 스크리너가 돌지 않고 있습니다.`}
     </p>
   );
 }
@@ -396,7 +407,7 @@ function PositionTable({
       <table className="w-full text-sm min-w-[720px]">
         <thead className="bg-white/[0.03] text-white/50 text-xs">
           <tr>
-            {["종목", "패턴", "진입일", "보유", "매수가", "현재가", "수량", "손익", "수익률", ""]
+            {["종목", "패턴", "진입일", "보유", "매수가", "현재가", "수량", "손익", "수익률(비용반영)", ""]
               .map((h) => (
                 <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
               ))}
@@ -465,6 +476,48 @@ function PositionTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** 어느 패턴에서 담은 게 나았는지 — 성적표가 '화면에 떴던 종목 전체'를 재는 것과 달리
+ *  여기는 '내가 실제로 고른 것'만 잰다. 표본이 얇으니 판단 근거로 쓰기 전에 건수를 봐야 한다. */
+function PatternRollup({ rows, unit }: { rows: pf.Valued[]; unit: string }) {
+  const roll = pf.byPattern(rows);
+  if (roll.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-sm font-medium text-white/70 mb-1">패턴별 내 성적</div>
+      <p className="text-xs text-white/35 mb-3">
+        내가 담은 종목만 집계합니다. 건수가 적으면 우연입니다 — 이번 실측에서 63스캔·수천 건으로도
+        패턴 간 차이가 노이즈와 구별되지 않았습니다.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[420px]">
+          <thead className="text-white/45 text-xs">
+            <tr>
+              {["패턴", "건수", "승", "평균 수익률", "누적 손익"].map((h) => (
+                <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {roll.map((r) => (
+              <tr key={r.pattern} className="border-t border-white/5">
+                <td className="px-2 py-1.5">{PATTERN_LABEL[r.pattern] ?? r.pattern}</td>
+                <td className="px-2 py-1.5 tabular-nums text-white/60">{r.n}</td>
+                <td className="px-2 py-1.5 tabular-nums text-white/60">{r.wins}</td>
+                <td className={`px-2 py-1.5 tabular-nums font-medium ${tone(r.avgPct)}`}>
+                  {pct(r.avgPct)}
+                </td>
+                <td className={`px-2 py-1.5 tabular-nums ${tone(r.totalPnl)}`}>
+                  {money(r.totalPnl, unit)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
