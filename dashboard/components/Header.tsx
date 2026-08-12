@@ -6,8 +6,8 @@ import { BarChart2, LayoutDashboard, History, ListChecks } from "lucide-react";
 const NAV = [
   { href: "/",          label: "대시보드",  icon: LayoutDashboard },
   { href: "/backtest",  label: "백테스트",  icon: BarChart2 },
-  { href: "/replay/picks", label: "종목별 성과", icon: ListChecks },
-  { href: "/replay",    label: "패턴별 집계",  icon: History },
+  { href: "/track",     label: "성적표",     icon: ListChecks },
+  { href: "/replay",    label: "3년치 통계",  icon: History },
 ];
 
 export function Header({ runAt }: { runAt?: string }) {

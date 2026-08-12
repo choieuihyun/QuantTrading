@@ -549,7 +549,7 @@ def run(cfg: dict = None) -> dict:
         print(f"  ⚠ 실패율이 높습니다 — 데이터 소스 rate limit 또는 상장기간 부족 의심")
 
     if not results:
-        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
+        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}, {}
 
     all_df = pd.DataFrame(results)
 
@@ -561,7 +561,7 @@ def run(cfg: dict = None) -> dict:
     print(f"거래 가능 필터: {len(all_df)} → {int(tradable.sum())}종목 (거래정지/저유동성 제외)")
     all_df = all_df[tradable]
     if all_df.empty:
-        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
+        return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}, {}
 
     common_extra = [c for c in EXTRA_COLS.get("common_trend", []) if c in all_df.columns]
 
@@ -630,4 +630,7 @@ def run(cfg: dict = None) -> dict:
     for k, v in output.items():
         print(f"[{k}] {len(v)}종목")
 
-    return output
+    # 과거에 뽑혔던 종목의 '지금 가격'을 알아야 성적표를 만들 수 있다.
+    # 유니버스 전체 시세를 이미 받아둔 상태라 여기서 넘기면 추가 조회가 필요 없다.
+    prices = {str(t): float(p) for t, p in zip(all_df["ticker"], all_df["price"])}
+    return output, prices

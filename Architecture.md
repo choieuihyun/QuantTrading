@@ -95,8 +95,8 @@ screener.yml이 하는 일 (순서대로):
 - Firebase에서 최신 스크리닝 결과를 불러와서 테이블/차트로 표시
 - 화면 4개 (모두 🇰🇷🇺🇸₿ 마켓 선택)
   - `/` 스크리닝 · `/backtest` 신호 단위 통계
-  - `/replay/picks` **종목별 성과** — 날짜·패턴 선택 + 종목 검색, "그날 샀으면 지금 얼마"
-  - `/replay` 패턴별 집계 — 87스캔일 전체 평균
+  - `/track` **성적표** — N일 전 리스트가 지금 몇 %인지. 날짜·패턴 선택 + 종목 검색 (자동 갱신)
+  - `/replay` 3년치 통계 — 87스캔일 전체 평균 (수동 갱신)
 - 로컬 실행 시 `dashboard/.env.local`에 `NEXT_PUBLIC_FIREBASE_API_KEY`,
   `NEXT_PUBLIC_FIREBASE_PROJECT_ID` 필요 (gitignore 대상이라 머신마다 개별 생성)
 - PC + 모바일 둘 다 대응
@@ -198,6 +198,42 @@ screener.yml → python main.py
 
 ---
 
+## 실전 성적표 (`tracker.py`)
+
+**"N일 전 이 패턴에 떴던 종목, 지금 몇 %?"** 에 답하는 경로. 일일 스크리너 안에서
+자동으로 계산되며 수동 실행이 필요 없다.
+
+```
+매 실행마다:
+  screener.run()이 유니버스 전체 시세를 이미 받아둠 → {ticker: 현재가}
+        ↓
+  screener_results에서 최근 75일치 과거 문서를 읽음 (실제로 화면에 떴던 목록)
+        ↓
+  그때 표시됐던 price vs 오늘 price 비교
+        ↓
+  scorecard/{market}_{date} 로 저장 → /track 화면
+```
+
+**replay.py와 나눠 쓰는 이유** — 묻는 질문이 다르다.
+
+| | tracker.py | replay.py |
+|---|---|---|
+| 데이터 | 실제로 화면에 떴던 기록 | 과거를 재구성 |
+| 기간 | 운영 시작 이후 (2026-05-11~) | 3년 |
+| 갱신 | **자동, 하루 2회** | 수동 (몇 시간 소요) |
+| 편향 | 없음 (사실 그대로) | 재구성 가정에 의존 |
+| 용도 | "지금 얼마" — 투자 판단 | "이 패턴이 통하나" — 통계 |
+
+성적표는 추가 조회가 없다. 과거 목록은 이미 Firestore에 있고 현재가는 스크리닝 과정에서
+받은 것을 재사용한다. 과거 문서에서 `backtest` 블록은 용량 대부분을 차지하므로
+`select()`로 필요한 필드만 읽는다.
+
+**주의** — 표시 가격은 신호일 종가다. 실제 체결은 다음날 시가라 조금 다르고, 수수료·세금이
+반영되지 않은 단순 등락률이다. 오늘 유니버스에서 사라진 종목(폐지·거래정지·유동성 미달)은
+`gone`으로 표시하고 평균에서 제외한다.
+
+---
+
 ## 과거 재현 (`replay.py`)
 
 `backtest.py`가 "신호 뜬 종목 전부"를 사는 가정인 반면, 재현은 **화면에 뜨는 상위 N종목
@@ -244,6 +280,8 @@ screener.yml → python main.py
 **Firestore 저장 구조**
 
 ```
+scorecard/{market}_index         # 성적표 진입일 목록 (자동, 하루 2회)
+scorecard/{market}_{date}        # 그날 리스트의 현재 손익
 replay_results/{market}          # 집계 그리드 (패턴 × 보유일 × 상위N = 198조합)
 replay_picks/{market}_index      # 선택 가능한 날짜 목록 + 거래일 경과
 replay_picks/{market}_{date}     # 그날의 패턴별 종목 내역 (문서당 약 45KB)
@@ -297,7 +335,8 @@ QuantTrading/
 │   ├── market_config.py      # 시장별 설정 (유니버스/임계값/거래비용/조회봉수)
 │   ├── screener.py           # 시세 수집 + 지표 + 패턴 점수화
 │   ├── backtest.py           # 유니버스 표본 히스토리 스캔 (신호 단위)
-│   ├── replay.py             # 상위 N종목 리스트 재현 (리스트 단위)
+│   ├── tracker.py            # 실전 성적표 — 과거 실제 기록 vs 현재가 (자동)
+│   ├── replay.py             # 상위 N종목 리스트 재현 (리스트 단위, 수동)
 │   ├── dart_fetcher.py       # DART finstate_all 8분기 재무 + 파생지표/밸류에이션 (KR)
 │   ├── firebase_upload.py    # Firestore 업로드
 │   ├── .cache/               # OHLCV + 신호 패널 (gitignore)
@@ -305,8 +344,8 @@ QuantTrading/
 ├── dashboard/
 │   ├── app/page.tsx          # 종목 스크리닝 화면
 │   ├── app/backtest/page.tsx # 백테스트 통계 화면
-│   ├── app/replay/page.tsx   # 패턴별 집계 (보유일·상위N 선택)
-│   ├── app/replay/picks/     # 종목별 성과 — 날짜·패턴 선택 + 종목 검색
+│   ├── app/track/page.tsx    # 성적표 — N일 전 리스트가 지금 몇 %인지
+│   ├── app/replay/page.tsx   # 3년치 통계 (보유일·상위N 선택)
 │   ├── components/           # StockTable, ScoreBar, 상세 모달
 │   └── lib/                  # firebase, fetcher, types
 ├── CLAUDE.md
@@ -323,4 +362,5 @@ QuantTrading/
 | 2026-05-11 | 초안 작성 |
 | 2026-05-11 | GitHub Actions + Firebase 연동 구조 상세 설명 추가 |
 | 2026-08-02 | 스크리닝 3단계 필터 · 필수조건 게이트 · 백테스트 방법론 섹션 추가, 파일 구조 현행화 |
+| 2026-08-12 | 실전 성적표(`tracker.py`) 추가 — 일일 스크리너에서 자동 계산. 업로드 순서를 스크리닝 먼저로 변경 |
 | 2026-08-12 | 과거 재현(`replay.py`) 섹션 추가 — 리스트 단위 측정, 생존편향 보정, 유니버스 기준선. OBV 창 의존성 수정 및 `lookback_bars` 도입 반영 |

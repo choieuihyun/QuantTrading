@@ -2,7 +2,7 @@ import { collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebas
 import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
-  ReplayPickDoc, ReplayPickIndex,
+  ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -20,6 +20,21 @@ export async function fetchLatestResult(): Promise<ScreenerResult | null> {
 export async function fetchReplay(market: MarketKey): Promise<ReplayGrid | null> {
   const snap = await getDoc(doc(db, "replay_results", market));
   return snap.exists() ? (snap.data() as ReplayGrid) : null;
+}
+
+/** 실전 성적표 — 선택 가능한 진입일 목록. 하루 2회 자동 갱신된다. */
+export async function fetchScorecardIndex(market: MarketKey): Promise<ScorecardIndex | null> {
+  const snap = await getDoc(doc(db, "scorecard", `${market}_index`));
+  return snap.exists() ? (snap.data() as ScorecardIndex) : null;
+}
+
+/** 특정 진입일의 패턴별 종목 성적. 날짜당 문서가 나뉘어 있다. */
+export async function fetchScorecard(
+  market: MarketKey,
+  date: string
+): Promise<ScorecardDoc | null> {
+  const snap = await getDoc(doc(db, "scorecard", `${market}_${date}`));
+  return snap.exists() ? (snap.data() as ScorecardDoc) : null;
 }
 
 /** 선택 가능한 날짜 목록. 화면 진입 시 한 번만 읽는다. */

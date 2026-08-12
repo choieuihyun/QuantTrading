@@ -4,6 +4,7 @@ import screener
 import firebase_upload
 import dart_fetcher
 import backtest
+import tracker
 from market_config import ALL_CONFIGS
 
 PATTERN_NAMES = {
@@ -26,10 +27,12 @@ def main():
     print(f"Running screener [{run_type}]...")
 
     all_market_results = {}
+    all_prices = {}
 
     # ── 3개 시장 순차 실행 ─────────────────────────────────
     for market_key, cfg in ALL_CONFIGS.items():
-        results = screener.run(cfg)
+        results, prices = screener.run(cfg)
+        all_prices[market_key] = prices
 
         # DART 펀더멘털 보강 (KR만)
         if market_key == "kr" and os.environ.get("DART_API_KEY"):
@@ -61,6 +64,22 @@ def main():
                     cols.append("eps_yoy")
                 print("  " + df[cols].head(3).to_string())
 
+    # ── 실전 성적표 ────────────────────────────────────────
+    # 과거에 화면에 떴던 종목들이 지금 얼마인지. 저장된 기록 + 방금 받은 시세만 쓰므로
+    # 추가 조회가 없다.
+    print("\n실전 성적표 계산 중...")
+    try:
+        scorecards = tracker.build(firebase_upload.get_db(), all_prices, list(ALL_CONFIGS))
+    except Exception as e:
+        print(f"  성적표 실패: {e}")
+        scorecards = {}
+
+    # ── Firebase 업로드 (스크리닝 결과 먼저) ───────────────
+    # 백테스트가 잡 타임아웃에 걸리면 프로세스가 통째로 죽는다. 오늘 볼 종목이
+    # 매일 돌 필요 없는 백테스트에 인질로 잡히지 않도록 먼저 올린다.
+    firebase_upload.upload(all_market_results, run_type=run_type)
+    firebase_upload.save_scorecard(scorecards)
+
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
     # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면
     # 이미 오른 종목의 과거를 재는 셈이라 승률이 부풀려짐
@@ -74,8 +93,8 @@ def main():
             print(f"  백테스트 실패: {e}")
             all_backtest[market_key] = {}
 
-    # ── Firebase 업로드 ────────────────────────────────────
-    firebase_upload.upload(all_market_results, run_type=run_type, backtest=all_backtest)
+    if any(all_backtest.values()):
+        firebase_upload.attach_backtest(run_type, all_backtest)
     print("\nDone.")
 
 

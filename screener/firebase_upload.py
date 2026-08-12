@@ -98,6 +98,44 @@ def save_replay_picks(market_key: str, docs: list, index: dict):
     print(f"Uploaded → replay_picks/{market_key}_* ({n}일 + index)")
 
 
+def get_db():
+    _init_app()
+    return firestore.client()
+
+
+def save_scorecard(scorecards: dict):
+    """
+    실전 성적표 — 진입일별 문서. 하루 2회 갱신되므로 현재가가 항상 최신이다.
+    전 기간을 한 문서에 담으면 1MB를 넘어 날짜로 쪼갠다.
+    """
+    if not scorecards:
+        return
+    _init_app()
+    db = firestore.client()
+
+    batch, n = db.batch(), 0
+    for market, payload in scorecards.items():
+        for doc in payload["docs"]:
+            ref = db.collection("scorecard").document(f"{market}_{doc['date']}")
+            batch.set(ref, doc)
+            n += 1
+            if n % 400 == 0:  # Firestore 배치 한도 500
+                batch.commit()
+                batch = db.batch()
+        batch.set(db.collection("scorecard").document(f"{market}_index"), payload["index"])
+    batch.commit()
+    print(f"Uploaded → scorecard/* ({n}개 문서)")
+
+
+def attach_backtest(run_type: str, backtest: dict):
+    """백테스트는 스크리닝 업로드 후에 끝나므로 같은 문서에 나중에 덧붙인다"""
+    _init_app()
+    db = firestore.client()
+    doc_id = f"{datetime.today().strftime('%Y-%m-%d')}_{run_type}"
+    db.collection("screener_results").document(doc_id).set({"backtest": backtest}, merge=True)
+    print(f"Attached backtest → screener_results/{doc_id}")
+
+
 def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None):
     """
     all_market_results: { "kr": {p1: df, ...}, "us": {...}, "crypto": {...} }

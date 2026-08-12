@@ -147,6 +147,50 @@ export interface ReplayGrid {
   results: Record<string, ReplayStat>;
 }
 
+/**
+ * scorecard/{market}_{date} — 실전 성적표.
+ * 재구성이 아니라 그날 화면에 실제로 떴던 기록 + 오늘 가격. 하루 2회 자동 갱신.
+ */
+export interface ScorePick {
+  ticker: string;
+  name: string;
+  score?: number;
+  /** 그날 화면에 표시됐던 가격 */
+  entry?: number;
+  /** 오늘 가격. 상장폐지·거래정지로 오늘 유니버스에 없으면 null */
+  now?: number | null;
+  ret?: number | null;
+  stop_swing?: number;
+  rsi?: number;
+  pos_52w?: number;
+  gone?: boolean;
+}
+
+export interface ScorePattern {
+  picks: ScorePick[];
+  n: number;
+  gone: number;
+  avg?: number | null;
+  median?: number | null;
+  wins: number;
+  best?: number | null;
+  worst?: number | null;
+}
+
+export interface ScorecardDoc {
+  market: string;
+  date: string;
+  patterns: Record<string, ScorePattern>;
+}
+
+export interface ScorecardIndex {
+  market: string;
+  updated_at: string;
+  price_date: string;
+  patterns: string[];
+  dates: { date: string; days_ago: number }[];
+}
+
 /** replay_picks/{market}_{date} — 그날 그 패턴 리스트에 있던 종목별 손익 */
 export interface ReplayPick {
   rank: number;
