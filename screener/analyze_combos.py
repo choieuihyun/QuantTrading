@@ -17,7 +17,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
-from replay import CACHE_DIR
+from replay import CACHE_DIR, TIE_SEED
 from screener import (score_pattern, ALL_PATTERN_KEYS, SCORE_THRESHOLD,
                       TREND_PATTERN_KEYS, CUSTOM_PATTERN_KEYS)
 from market_config import ALL_CONFIGS
@@ -107,9 +107,14 @@ def main():
     print("-" * 92)
     for name in ["common_trend", "common_all"]:
         stats(p[p[f"f_{name}"]], name)
-        top = (p[p[f"f_{name}"]].sort_values(f"s_{name}", ascending=False)
-               .groupby("date").head(TOP_N))
-        stats(top, f"└ 상위{TOP_N}", indent="")
+        # 동점을 행 순서로 깨면 없는 선정력이 생긴다 — replay._select와 같은 고정 시드 지터
+        elig = p[p[f"f_{name}"]].copy()
+        elig["_tie"] = elig[f"s_{name}"] + np.random.default_rng(TIE_SEED).random(len(elig)) * 1e-6
+        rank = elig.groupby("date")["_tie"].rank(ascending=False, method="first")
+        top = elig[rank <= TOP_N]
+        # 상위 N의 점수가 몇 종류인지 = 정렬에 정보가 있는지
+        cut_tie = float((top.groupby("date")[f"s_{name}"].nunique() <= 1).mean())
+        stats(top, f"└ 상위{TOP_N} (동점날 {cut_tie*100:.0f}%)", indent="")
 
     # ── 단독 ──
     print(f"\n■ 단독 패턴\n{hdr}")
