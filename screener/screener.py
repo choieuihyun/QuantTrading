@@ -610,6 +610,14 @@ SCORE_FNS = {
 }
 
 
+def rs_rating_from_pct(pct: pd.Series) -> pd.Series:
+    """
+    백분위(0~1)를 IBD RS Rating(1~99)로. 라이브와 재현이 반드시 같은 식을 써야 하므로
+    변환은 여기 한 곳에만 둔다.
+    """
+    return (pct * 98 + 1).round(0)
+
+
 def attach_rs_rating(df: pd.DataFrame) -> pd.DataFrame:
     """
     IBD RS Rating(1~99) — rs_strength를 유니버스 백분위로 환산.
@@ -617,12 +625,13 @@ def attach_rs_rating(df: pd.DataFrame) -> pd.DataFrame:
     O'Neil의 L은 "코스피보다 몇 % 더 올랐나"가 아니라 "전 종목 중 몇 등인가"다.
     종목 하나만 봐서는 구할 수 없어 전체를 모은 뒤 한 번에 계산한다.
     모집단은 거래 가능 종목 — 라이브와 재현이 같은 기준을 써야 값이 일치한다.
+
+    재현은 날짜별로 나눠야 하므로 groupby로 같은 계산을 한다 (replay.build 참고).
     """
     if "rs_strength" not in df.columns or df.empty:
         df["rs_rating"] = None
         return df
-    pct = df["rs_strength"].rank(pct=True, na_option="keep")
-    df["rs_rating"] = (pct * 98 + 1).round(0)
+    df["rs_rating"] = rs_rating_from_pct(df["rs_strength"].rank(pct=True, na_option="keep"))
     return df
 
 

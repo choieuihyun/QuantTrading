@@ -28,7 +28,7 @@ import FinanceDataReader as fdr
 
 from screener import (
     calc_signals_from_df, drop_partial_bar, sanitize_ohlc, get_universe, score_pattern,
-    attach_rs_rating,
+    attach_rs_rating, rs_rating_from_pct,
     ALL_PATTERN_KEYS, TREND_PATTERN_KEYS, ACCUM_PATTERN_KEYS, CUSTOM_PATTERN_KEYS,
     SCORE_THRESHOLD, _last_weekday,
 )
@@ -298,11 +298,11 @@ def build(market_key: str, days: int, scan_interval: int, sample: int | None) ->
 
     panel = pd.DataFrame(all_rows)
 
-    # RS Rating은 날짜별 유니버스 백분위 — 라이브가 거래가능 종목을 모집단으로 쓰므로 동일하게 맞춘다
-    panel = (panel[panel["is_tradable"]]
-             .groupby("date", group_keys=False)
-             .apply(attach_rs_rating, include_groups=True)
-             .reset_index(drop=True))
+    # RS Rating은 날짜별 유니버스 백분위 — 라이브가 거래가능 종목을 모집단으로 쓰므로 동일하게 맞춘다.
+    # groupby.apply는 pandas 버전에 따라 동작이 달라져(include_groups 제거) rank로 직접 계산한다.
+    panel = panel[panel["is_tradable"]].reset_index(drop=True)
+    panel["rs_rating"] = rs_rating_from_pct(
+        panel.groupby("date")["rs_strength"].rank(pct=True, na_option="keep"))
 
     # 벤치마크 수익률을 동일 창(다음날 시가 → h일 뒤 종가)으로 붙여 초과수익을 비교 가능하게 만듦
     bidx = bench.index
