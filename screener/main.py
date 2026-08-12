@@ -50,10 +50,12 @@ def main():
 
     all_market_results = {}
     all_prices = {}
+    all_names = {}
 
     for market_key, cfg in configs.items():
-        results, prices = screener.run(cfg)
+        results, prices, names = screener.run(cfg)
         all_prices[market_key] = prices
+        all_names[market_key] = names
 
         # DART 펀더멘털 보강 (KR만)
         if market_key == "kr" and os.environ.get("DART_API_KEY"):
@@ -100,6 +102,11 @@ def main():
     # 매일 돌 필요 없는 백테스트에 인질로 잡히지 않도록 먼저 올린다.
     firebase_upload.upload(all_market_results, run_type=run_type)
     firebase_upload.save_scorecard(scorecards)
+    # 가상 매매 평가용 — 보유 종목이 패턴 목록에서 빠져도 현재가를 알 수 있어야 한다
+    try:
+        firebase_upload.save_prices(all_prices, all_names)
+    except Exception as e:
+        print(f"  시세 업로드 실패: {e}")
 
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
     # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면

@@ -2,7 +2,7 @@ import { collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebas
 import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
-  ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex,
+  ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -70,4 +70,10 @@ export async function fetchReplayPicks(
 export async function fetchFundamentals(ticker: string): Promise<Fundamentals | null> {
   const snap = await getDoc(doc(db, "fundamentals", ticker));
   return snap.exists() ? (snap.data() as Fundamentals) : null;
+}
+
+/** 유니버스 전 종목 시세. 가상 매매 평가에 쓴다 — 보유 종목이 패턴 목록에 없어도 값이 나온다. */
+export async function fetchPrices(market: MarketKey): Promise<PriceDoc | null> {
+  const snap = await getDoc(doc(db, "prices", market));
+  return snap.exists() ? (snap.data() as PriceDoc) : null;
 }

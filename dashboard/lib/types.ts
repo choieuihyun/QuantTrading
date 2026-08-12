@@ -289,3 +289,30 @@ export interface ScreenerResult {
   common_all: Stock[];
   [key: string]: Stock[] | unknown;
 }
+
+/** prices/{market} — 유니버스 전 종목 시세. 가상 매매 평가용(하루 2회 갱신) */
+export interface PriceDoc {
+  market_date: string;
+  run_at: { seconds: number };
+  count: number;
+  prices: Record<string, number>;
+  names: Record<string, string>;
+}
+
+/** 가상 매매 보유 기록. 브라우저 localStorage에만 저장된다 — 서버에 쓰지 않는다 */
+export interface Position {
+  id: string;
+  market: MarketKey;
+  ticker: string;
+  name: string;
+  /** 담은 날 (YYYY-MM-DD) */
+  entryDate: string;
+  entryPrice: number;
+  shares: number;
+  /** 어느 화면에서 담았는지 — 패턴별 성적을 나중에 되짚기 위해 */
+  pattern?: PatternKey | null;
+  note?: string;
+  /** 청산했으면 기록. 남겨둬야 '팔았으면 얼마였나'를 볼 수 있다 */
+  exitDate?: string | null;
+  exitPrice?: number | null;
+}

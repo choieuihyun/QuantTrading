@@ -816,4 +816,6 @@ def run(cfg: dict = None) -> dict:
     # 과거에 뽑혔던 종목의 '지금 가격'을 알아야 성적표를 만들 수 있다.
     # 유니버스 전체 시세를 이미 받아둔 상태라 여기서 넘기면 추가 조회가 필요 없다.
     prices = {str(t): float(p) for t, p in zip(all_df["ticker"], all_df["price"])}
-    return output, prices
+    # 가상 매매에서 종목을 검색해 담으려면 코드만으로는 부족하다.
+    names = {str(t): str(n) for t, n in zip(all_df["ticker"], all_df["name"])}
+    return output, prices, names

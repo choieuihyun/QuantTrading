@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart2, LayoutDashboard, History, ListChecks } from "lucide-react";
+import { BarChart2, LayoutDashboard, History, ListChecks, Briefcase } from "lucide-react";
 
 const NAV = [
   { href: "/",          label: "대시보드",  icon: LayoutDashboard },
   { href: "/backtest",  label: "백테스트",  icon: BarChart2 },
   { href: "/track",     label: "성적표",     icon: ListChecks },
+  { href: "/portfolio", label: "가상 매매",  icon: Briefcase },
   { href: "/replay",    label: "3년치 통계",  icon: History },
 ];
 
