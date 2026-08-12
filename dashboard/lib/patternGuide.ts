@@ -21,27 +21,42 @@ export interface PatternGuide {
 // 원문: /패턴기법정리.md — 런타임 파싱 대신 하드코딩(기존 PATTERNS 인라인 문자열 관례와 동일)
 export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   common_trend: {
-    title: "★ 추세 공통",
-    tagline: "가장 높은 신뢰도 — 신고가형 상승 추세 종목",
-    composition: "Stage 2 + CAN SLIM + Darvas Box 중 2개 이상 해당",
+    title: "★ 돌파 공통",
+    tagline: "서로 다른 방식으로 '저항 돌파'를 확인한 종목",
+    composition: "Stage 2 + CAN SLIM + Darvas + VCP 중 2개 이상 해당",
     concept:
-      "세 가지 검증된 추세 추종 방법론이 동시에 가리키는 종목.\n이미 강한 추세가 형성된 모멘텀 추종형.",
+      "네 기법 모두 '저항을 뚫는 순간'을 잡습니다 — 베이스 저항(Stage 2), 신고가(CAN SLIM),\n" +
+      "박스 천장(Darvas), 피벗(VCP). 서로 다른 방식으로 같은 사건을 확인하면 신뢰도가 올라간다는 발상.",
     period: "스윙 ~ 중기 (4주 ~ 6개월)",
+    note:
+      "⚠️ 이미 오른 종목이 뜨는 게 정상입니다. 네 기법 전부 상승 추세를 전제로 하며, " +
+      "특히 VCP·CAN SLIM은 52주 고점 25% 이내를 요구합니다. 실측: 선정 종목의 3개월 모멘텀 " +
+      "중앙값 +53%(유니버스 +7%). 저평가 종목을 찾는 지표가 아닙니다.",
   },
   common_accum: {
     title: "★ 매집 공통",
-    tagline: "가장 높은 신뢰도 — 폭발 직전 매집 완료 종목",
-    composition: "Wyckoff + VCP 둘 다 해당",
+    tagline: "거래범위 안에서 매집이 확인된 종목",
+    composition: "Wyckoff 단독 (현재 구성 1개)",
     concept:
-      "스마트머니 매집 + 변동성 수축이 동시에 포착된 종목.\n아직 크게 안 올랐지만 내부에서 매집 중 — 선행 진입형.",
+      "아직 크게 오르지 않았지만 거래범위 안에서 매도 압력이 마르고 있는 종목 — 선행 진입형.\n" +
+      "돌파 공통과 정반대 국면을 봅니다.",
     period: "중기 ~ 장기 (2개월 ~ 1년+)",
+    note:
+      "원래 Wyckoff + VCP 둘 다였습니다. 원전 재구현 후 VCP가 Minervini Trend Template" +
+      "(상승 추세)을 요구하게 되어 횡보 매집과 양립할 수 없게 됐습니다 — 둘을 AND로 묶으면 " +
+      "영원히 비어 있습니다. VCP는 돌파 공통으로 옮겼습니다.",
   },
   common_all: {
     title: "☆ 내 패턴 공통",
-    tagline: "참고용 — 자체 개발 3패턴 중 2개 이상 해당",
+    tagline: "자체 개발 3패턴 중 2개 이상 — 외부 검증 없음",
     composition: "P1(정배열+매집) + P2(5일선추세) + P3(눌림목) 중 2개 이상",
-    concept: "한국 시장 특성에 맞춘 단기~스윙 진입 신호.",
+    concept:
+      "한국 시장 특성에 맞춘 단기~스윙 진입 신호.\n" +
+      "원전 기법과 달리 외부에서 검증된 방법론이 아니라 직접 정한 조건입니다.",
     period: "단기 스윙 (1~4주)",
+    note:
+      "신호 발생률이 12~15%로 원전 기법(1~5%)보다 훨씬 흔합니다 — 조건이 느슨하다는 뜻입니다. " +
+      "실측 선정력은 20일 −0.35%, 60일 −0.01%로 유니버스와 비슷한 수준입니다.",
   },
   canslim: {
     title: "CAN SLIM",
@@ -144,7 +159,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   p1: {
     title: "정배열 퍼지기 직전 + 매집",
     tagline: "이평선이 막 정렬되려는 시점 + 스마트머니 매집 신호 포착",
-    concept: "진입 논리: 정배열이 완성되기 직전이 가장 수익률이 높은 진입 타이밍",
+    concept:
+      "진입 논리: 정배열이 완성되기 직전이 가장 수익률이 높은 진입 타이밍.\n" +
+      "필수조건 — 부분 정배열 + (OBV 상승 또는 볼린저 수축). 나머지는 가산점입니다.",
     conditions: [
       { cond: "정배열 진행 중", ind: "partial_aligned", crit: "MA5 > MA20 > MA60" },
       { cond: "이평선 막 돌파", ind: "ma20_just_cross", crit: "MA20이 MA60을 최근 10일 내 돌파" },
@@ -154,6 +171,13 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
       { cond: "양봉 우세", ind: "bullish_ratio", crit: "최근 20일 60% 이상 양봉" },
       { cond: "MACD 반등", ind: "macd_hist↑", crit: "히스토그램 증가 중" },
     ],
+    scoring: "정배열 20 / MA20 돌파 15 / MA60 돌파 10 / 볼린저 수축 20 / OBV 상승 15 / OBV 신고점 10 / 양봉 10 / MACD 반등 10 / RSI 5 / 거래량 5",
+    note:
+      "필수조건: 부분 정배열 + (OBV 상승 또는 볼린저 수축). " +
+      "⚠️ RSI를 표준(Wilder 평활)으로 정정하면서 이 패턴의 RSI 구간 판정이 바뀔 수 있습니다 — " +
+      "실측 60종목 중 15종목에서 게이트 판정이 뒤집혔습니다. 임계값(50~70, 35~55)은 " +
+      "옛 RSI 기준으로 정해진 값이라 재검토가 필요합니다.",
+
   },
   p2: {
     title: "5일선 추세 + 거래량 터짐",
@@ -168,6 +192,13 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
       { cond: "RSI 건강", ind: "rsi", crit: "50~70 구간" },
       { cond: "거래량 터짐", ind: "vol_ratio", crit: "2배 이상" },
     ],
+    scoring: "완전 정배열 20 / 5일선 위 10 / 5일선 우상향 10 / 이탈 없음 10 / MACD 0선 위 10 / 골든크로스 10 / 히스토그램 5 / RSI 10 / 거래량 10+5 / OBV 5 / 모멘텀 5",
+    note:
+      "필수조건: 완전 정배열 + 5일선 위 + MACD > 0. " +
+      "⚠️ RSI를 표준(Wilder 평활)으로 정정하면서 이 패턴의 RSI 구간 판정이 바뀔 수 있습니다 — " +
+      "실측 60종목 중 15종목에서 게이트 판정이 뒤집혔습니다. 임계값(50~70, 35~55)은 " +
+      "옛 RSI 기준으로 정해진 값이라 재검토가 필요합니다.",
+
   },
   p3: {
     title: "눌림목",
@@ -181,5 +212,12 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
       { cond: "MACD 바닥 반등", ind: "macd_hist↑", crit: "히스토그램 0선 아래서 증가" },
       { cond: "RSI 조정", ind: "rsi", crit: "35~55 구간" },
     ],
+    scoring: "조정 범위 25 / 피보나치 20 / MA20 지지 15 / 오늘 양봉 10 / 정배열 10 / MACD 바닥 반등 10 / RSI 10",
+    note:
+      "필수조건: 조정 범위 + MA20 위. " +
+      "⚠️ RSI를 표준(Wilder 평활)으로 정정하면서 이 패턴의 RSI 구간 판정이 바뀔 수 있습니다 — " +
+      "실측 60종목 중 15종목에서 게이트 판정이 뒤집혔습니다. 임계값(50~70, 35~55)은 " +
+      "옛 RSI 기준으로 정해진 값이라 재검토가 필요합니다.",
+
   },
 };
