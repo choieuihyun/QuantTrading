@@ -93,7 +93,10 @@ screener.yml이 하는 일 (순서대로):
 
 - Vercel에 배포 → 별도 서버 없이 URL로 접속
 - Firebase에서 최신 스크리닝 결과를 불러와서 테이블/차트로 표시
-- `/` 스크리닝 화면, `/backtest` 백테스트 통계 화면 (둘 다 🇰🇷🇺🇸₿ 마켓 선택)
+- 화면 4개 (모두 🇰🇷🇺🇸₿ 마켓 선택)
+  - `/` 스크리닝 · `/backtest` 신호 단위 통계
+  - `/replay/picks` **종목별 성과** — 날짜·패턴 선택 + 종목 검색, "그날 샀으면 지금 얼마"
+  - `/replay` 패턴별 집계 — 87스캔일 전체 평균
 - 로컬 실행 시 `dashboard/.env.local`에 `NEXT_PUBLIC_FIREBASE_API_KEY`,
   `NEXT_PUBLIC_FIREBASE_PROJECT_ID` 필요 (gitignore 대상이라 머신마다 개별 생성)
 - PC + 모바일 둘 다 대응
@@ -195,24 +198,115 @@ screener.yml → python main.py
 
 ---
 
+## 과거 재현 (`replay.py`)
+
+`backtest.py`가 "신호 뜬 종목 전부"를 사는 가정인 반면, 재현은 **화면에 뜨는 상위 N종목
+리스트를 통째로 샀을 때**를 측정한다. 실제 사용 행동과 일치하는 쪽은 후자다.
+
+```
+1단계 build  (느림, 1회)
+  상장폐지 포함 유니버스 → 종목별 OHLCV 캐시(parquet)
+        ↓
+  벤치마크 거래일을 기준 달력으로 삼아 N봉 간격 스캔
+        ↓
+  시점별 신호 + 5/20/60일 미래수익률 → panel_{market}.parquet
+
+2단계 eval / publish  (빠름, 반복)
+  패널 로드 → 8패턴 + 3공통 스코어링 → 날짜별 상위 N 선정
+        ↓
+  동일가중 수익률을 유니버스 평균·지수와 비교
+```
+
+**backtest.py와 다른 점**
+
+| 항목 | backtest.py | replay.py |
+|------|-------------|-----------|
+| 평가 단위 | 신호 발생 종목 전부 | 스코어 상위 N종목 리스트 |
+| 대상 패턴 | 공통 3개 | 8패턴 + 공통 3개 |
+| 유니버스 | 현재 상장 150종목 표본 | 폐지 포함 전 종목 (KR 약 2,650) |
+| 진입 시점 | 신호일 종가 | **신호 다음날 시가** |
+| 기준선 | 없음 (절대수익) | 유니버스 평균 + 지수 |
+| 재실행 | 매번 전체 스캔 | 패널 1회 적재 후 조건만 교체 |
+
+**측정 설계**
+
+| 항목 | 처리 |
+|------|------|
+| 생존 편향 | `KRX-DELISTING`으로 폐지 종목까지 유니버스에 포함. 보유 중 폐지되면 마지막 체결가로 청산(행을 버리면 편향이 되돌아옴) |
+| 시총 필터 | 미적용 — 과거 시총을 알 수 없어 오늘 시총으로 거르면 미래 정보가 샘. 유동성은 `avg_value_20`로 시점별 판정 |
+| 진입 편향 | 신호는 종가 확정 후에야 알 수 있으므로 다음날 시가 진입. 당일 종가로 사면 거래량 급등일의 갭상승을 공짜로 먹음 |
+| 우측 끝 | 아직 미래가 없는 최근 스캔일은 해당 보유기간을 기록하지 않음 (60일 보유를 3일로 재는 것 방지) |
+| 가중 방식 | 지수는 시총가중이라 대형주 장세에서 동일가중 포트폴리오가 구조적으로 뒤짐. **유니버스 동일가중 평균**을 기준선으로 둬 종목 선정력만 분리 |
+| 동점 처리 | 고정 시드 난수로 타이브레이크. 행 순서로 두면 적재 순서(≈종목코드)가 순위가 되어 없는 선정력이 생김 |
+| 거래정지 | FDR은 정지일 시/고/저를 0으로 준다. 그대로 두면 저가 0이 손절 도달로 잡혀 0원 청산(-100%)이 되므로 `sanitize_ohlc`가 종가로 채움 |
+| 라이브 일치 | `verify`가 조회 봉 수(300 vs 전체)를 달리해 같은 신호가 나오는지 확인. 시작일만 달리하면 내부에서 같은 300봉으로 수렴해 항상 통과함 |
+
+**Firestore 저장 구조**
+
+```
+replay_results/{market}          # 집계 그리드 (패턴 × 보유일 × 상위N = 198조합)
+replay_picks/{market}_index      # 선택 가능한 날짜 목록 + 거래일 경과
+replay_picks/{market}_{date}     # 그날의 패턴별 종목 내역 (문서당 약 45KB)
+```
+
+날짜별로 문서를 쪼갠 이유 — 전 기간 종목 내역을 한 문서에 담으면 Firestore 1MB 한도를 넘는다.
+화면은 사용자가 고른 날짜 하나만 읽는다.
+
+**신호의 창 길이 의존성 제거** — OBV는 `cumsum`이라 절대값이 조회 구간 시작점에 따라 달라진다.
+신고점 판정을 `최고값 × 0.98`로 하면 기준선이 같이 움직여 라이브와 재현이 다른 값을 냈다
+(표본 8종목 중 1종목에서 플래그가 뒤집힘). 60일 변동폭 대비 상대 위치로 바꾸고,
+`lookback_bars`로 두 경로의 조회 봉 수를 고정했다.
+
+**실행**
+
+```bash
+python replay.py verify  --market kr              # 라이브/재현 동일성
+python replay.py build   --market kr --days 1100  # 패널 적재
+python replay.py eval    --market kr --hold 20 --top 30
+python replay.py picks   --market kr --pattern common_trend --date 2026-07-13 --top 10
+python replay.py picks   --market kr --pattern p3 --date 2026-06-01 --hold 20
+python replay.py publish --market kr              # 집계 그리드 + 종목 내역 → Firebase
+```
+
+**두 가지 청산 가정** — 묻는 질문이 다르므로 둘 다 제공한다.
+
+| | `--hold now` (기본) | `--hold 5/20/60` |
+|---|---|---|
+| 청산 | 안 팔고 현재가 | N거래일 뒤 매도 |
+| 손절 | 미적용 (터치 여부만 표시) | ATR 손절 도달 시 청산 |
+| 보유일 | 날짜마다 다름 | 고정 |
+| 쓰임 | **"그날 샀으면 지금 얼마"** — 실제 손익 확인 | 패턴 간 공정 비교 (보유일이 같아야 성립) |
+
+`eval`은 집계(패턴별 평균), `picks`는 특정 날짜의 **종목별 내역**을 낸다.
+
+일일 스크리너와 분리된 `replay.yml`(수동 실행)로 돌린다 — 유니버스 전체를 과거 시점마다
+재스캔하므로 90분 예산 안에 들어가지 않는다.
+
+---
+
 ## 파일 구조
 
 ```
 QuantTrading/
 ├── .github/
 │   └── workflows/
-│       └── screener.yml      # GitHub Actions 스케줄 정의
+│       ├── screener.yml      # GitHub Actions 스케줄 정의 (하루 2회)
+│       └── replay.yml        # 과거 재현 (수동 실행, 최대 300분)
 ├── screener/
 │   ├── main.py               # 진입점 (3개 시장 순차 실행)
-│   ├── market_config.py      # 시장별 설정 (유니버스/임계값/거래비용)
+│   ├── market_config.py      # 시장별 설정 (유니버스/임계값/거래비용/조회봉수)
 │   ├── screener.py           # 시세 수집 + 지표 + 패턴 점수화
-│   ├── backtest.py           # 유니버스 표본 히스토리 스캔
+│   ├── backtest.py           # 유니버스 표본 히스토리 스캔 (신호 단위)
+│   ├── replay.py             # 상위 N종목 리스트 재현 (리스트 단위)
 │   ├── dart_fetcher.py       # DART finstate_all 8분기 재무 + 파생지표/밸류에이션 (KR)
 │   ├── firebase_upload.py    # Firestore 업로드
+│   ├── .cache/               # OHLCV + 신호 패널 (gitignore)
 │   └── requirements.txt      # Python 의존성
 ├── dashboard/
 │   ├── app/page.tsx          # 종목 스크리닝 화면
 │   ├── app/backtest/page.tsx # 백테스트 통계 화면
+│   ├── app/replay/page.tsx   # 패턴별 집계 (보유일·상위N 선택)
+│   ├── app/replay/picks/     # 종목별 성과 — 날짜·패턴 선택 + 종목 검색
 │   ├── components/           # StockTable, ScoreBar, 상세 모달
 │   └── lib/                  # firebase, fetcher, types
 ├── CLAUDE.md
@@ -229,3 +323,4 @@ QuantTrading/
 | 2026-05-11 | 초안 작성 |
 | 2026-05-11 | GitHub Actions + Firebase 연동 구조 상세 설명 추가 |
 | 2026-08-02 | 스크리닝 3단계 필터 · 필수조건 게이트 · 백테스트 방법론 섹션 추가, 파일 구조 현행화 |
+| 2026-08-12 | 과거 재현(`replay.py`) 섹션 추가 — 리스트 단위 측정, 생존편향 보정, 유니버스 기준선. OBV 창 의존성 수정 및 `lookback_bars` 도입 반영 |

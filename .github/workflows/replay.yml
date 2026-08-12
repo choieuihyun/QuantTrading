@@ -1,0 +1,57 @@
+name: Replay Backtest
+
+# 일일 스크리너(90분 예산)와 분리 — 유니버스 전체를 과거 시점마다 재스캔해 오래 걸린다
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: "시장"
+        type: choice
+        options: [kr, us, crypto]
+        default: kr
+      days:
+        description: "재현 구간 (일)"
+        default: "1100"
+      interval:
+        description: "스캔 간격 (거래일)"
+        default: "5"
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    defaults:
+      run:
+        working-directory: screener
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: screener/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # 라이브와 재현이 같은 신호를 내는지 먼저 확인 — 다르면 측정 자체가 무의미하므로 중단
+      - name: Verify live/replay parity
+        run: python replay.py verify --market ${{ inputs.market }} --n 12
+
+      - name: Build panel
+        run: python replay.py build --market ${{ inputs.market }} --days ${{ inputs.days }} --interval ${{ inputs.interval }}
+
+      # 패널은 러너 파일시스템에만 있다 — 업로드가 실패하면 몇 시간짜리 적재를 처음부터 다시 해야 함
+      - uses: actions/upload-artifact@v4
+        with:
+          name: replay-panel-${{ inputs.market }}
+          path: screener/.cache/panel_*.parquet
+          retention-days: 7
+
+      - name: Publish to Firebase
+        run: python replay.py publish --market ${{ inputs.market }}
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}

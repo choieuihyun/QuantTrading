@@ -17,3 +17,6 @@ docs_cache/
 
 # OS
 .DS_Store
+
+# 재현 백테스트 캐시 (OHLCV + 신호 패널)
+screener/.cache/

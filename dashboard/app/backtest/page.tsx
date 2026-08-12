@@ -1,6 +1,7 @@
 "use client";
 import useSWR from "swr";
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -225,6 +226,17 @@ export default function BacktestPage() {
               <span>{flag}</span>{label}
             </button>
           ))}
+        </div>
+
+        <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-indigo-200/70 leading-relaxed">
+            <strong className="text-indigo-200">이 페이지는 &quot;신호 단위&quot; 성과입니다.</strong>{" "}
+            신호가 뜬 종목을 전부 샀다고 가정하고, 기준선 없이 절대 수익률만 봅니다.
+            실제로 화면에 뜬 <strong>상위 N종목 리스트를 샀을 때</strong>가 궁금하다면{" "}
+            <Link href="/replay" className="underline hover:text-indigo-100">과거 재현</Link>을 보세요 —
+            상장폐지 종목을 포함하고, 유니버스 평균 대비로 종목 선정력을 분리해 측정합니다.
+            같은 패턴이라도 두 페이지의 숫자가 다르게 보이는 건 재는 대상이 다르기 때문입니다.
+          </p>
         </div>
 
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3">

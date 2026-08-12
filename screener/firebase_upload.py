@@ -65,6 +65,39 @@ def save_fundamentals(histories: dict):
     print(f"fundamentals 저장: {n}종목")
 
 
+def save_replay(market_key: str, grid: dict):
+    """
+    재현 백테스트 결과를 시장별 문서로 저장. 보유일·상위N 조합을 미리 계산해 두고
+    대시보드는 조회만 하도록 만든다 (조합마다 재계산하면 화면에서 못 씀).
+    """
+    _init_app()
+    db = firestore.client()
+    db.collection("replay_results").document(market_key).set(grid)
+    print(f"Uploaded → replay_results/{market_key} "
+          f"(조합 {len(grid.get('results', {}))}개, {grid.get('date_from')} ~ {grid.get('date_to')})")
+
+
+def save_replay_picks(market_key: str, docs: list, index: dict):
+    """
+    날짜별 종목 내역을 문서로 쪼개 저장. 전 기간을 한 문서에 담으면 1MB를 넘는다.
+    화면은 사용자가 고른 날짜 하나만 읽으면 된다.
+    """
+    _init_app()
+    db = firestore.client()
+
+    batch, n = db.batch(), 0
+    for doc in docs:
+        ref = db.collection("replay_picks").document(f"{market_key}_{doc['date']}")
+        batch.set(ref, doc)
+        n += 1
+        if n % 400 == 0:  # Firestore 배치 한도 500
+            batch.commit()
+            batch = db.batch()
+    batch.set(db.collection("replay_picks").document(f"{market_key}_index"), index)
+    batch.commit()
+    print(f"Uploaded → replay_picks/{market_key}_* ({n}일 + index)")
+
+
 def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None):
     """
     all_market_results: { "kr": {p1: df, ...}, "us": {...}, "crypto": {...} }

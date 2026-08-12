@@ -95,6 +95,114 @@ export interface Fundamentals {
 export type MarketKey = "kr" | "us" | "crypto";
 export type PatternKey = "p1" | "p2" | "p3" | "canslim" | "vcp" | "stage2" | "wyckoff" | "darvas" | "common_trend" | "common_accum" | "common_all";
 
+/** replay_results/{market} — 과거 재현: 상위 N종목 리스트를 통째로 샀을 때의 성과 */
+export interface ReplayStat {
+  pattern: string;
+  hold: number;
+  top_k: number;
+  threshold?: number;
+  n_dates: number;
+  n_picks: number;
+  avg_picks_per_date?: number;
+  no_stop?: boolean;
+  /** 상위 N종목 동일가중 수익률 (비용 반영, 스캔일 평균) */
+  port_return?: number;
+  bench_return?: number;
+  /** 그날 유동성을 통과한 전 종목의 동일가중 평균 */
+  uni_return?: number;
+  excess_return?: number;
+  excess_median?: number;
+  /** 종목 선정 실력 = 리스트 − 유니버스. 지수는 시총가중이라 가중방식 차이가 섞임 */
+  excess_uni?: number;
+  uni_hit_rate?: number;
+  /** 벤치마크를 이긴 '날짜'의 비율 — 종목 단위로 세면 같은 날이 N표가 되어 과대평가됨 */
+  date_hit_rate?: number;
+  name_hit_rate?: number;
+  /** 상위 N이 전부 동점이었던 날의 비율. 높으면 순위·RankIC를 해석하면 안 됨 */
+  tie_ratio?: number;
+  best_date?: string;
+  worst_date?: string;
+  worst_excess?: number;
+  stop_hit_rate?: number;
+  /** 보유 중 상장폐지되어 마지막 체결가로 청산된 건수 */
+  delisted_exits?: number;
+  rank_buckets?: Record<string, number>;
+  /** 스코어 순위와 실제 수익률 순위의 상관 — 0에 가까우면 정렬이 무의미 */
+  rank_ic?: number | null;
+}
+
+export interface ReplayGrid {
+  market: string;
+  generated_at: string;
+  date_from: string;
+  date_to: string;
+  panel_rows: number;
+  n_tickers: number;
+  n_dates: number;
+  threshold: number;
+  holds: number[];
+  tops: number[];
+  costs: { fee_rate: number; tax_rate: number; slippage: number };
+  /** 키 형식: "{pattern}|{hold}|{top_k}" */
+  results: Record<string, ReplayStat>;
+}
+
+/** replay_picks/{market}_{date} — 그날 그 패턴 리스트에 있던 종목별 손익 */
+export interface ReplayPick {
+  rank: number;
+  ticker: string;
+  name: string;
+  score: number;
+  /** 신호일 종가 */
+  price: number;
+  /** 실제 매수가 = 신호 다음날 시가 */
+  entry: number;
+  rsi: number;
+  vol_ratio: number;
+  pos_52w: number;
+  stop_swing: number;
+  /** 안 팔고 현재까지 보유했을 때의 수익률 (비용 반영) */
+  ret_now: number;
+  last_close: number;
+  held_bars: number;
+  /** 보유 중 ATR 손절선을 건드린 적 있는지 (청산하진 않음) */
+  touched_stop: boolean;
+  /** 고정 보유기간 — 아직 기간이 안 지났으면 null */
+  ret_5?: number | null;
+  ret_20?: number | null;
+  ret_60?: number | null;
+  stop_5?: boolean | null;
+  stop_20?: boolean | null;
+  stop_60?: boolean | null;
+}
+
+export interface ReplayPickSummary {
+  n: number;
+  port?: number;
+  uni?: number | null;
+  bench?: number;
+  wins?: number;
+}
+
+export interface ReplayPickDoc {
+  market: string;
+  date: string;
+  top_k: number;
+  threshold: number;
+  /** 키: 패턴명 */
+  patterns: Record<string, { summary: Record<string, ReplayPickSummary>; picks: ReplayPick[] }>;
+}
+
+export interface ReplayPickIndex {
+  market: string;
+  generated_at: string;
+  top_k: number;
+  threshold: number;
+  holds: number[];
+  dates: { date: string; bars_ago: number }[];
+  latest_bar: string;
+}
+
 export interface ScreenerResult {
   run_at: { seconds: number };
   market_date: string;
