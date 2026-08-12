@@ -43,13 +43,15 @@ def _apply_canslim_c(key: str, df):
 
 def main():
     run_type = sys.argv[1] if len(sys.argv) > 1 else "auto"
-    print(f"Running screener [{run_type}]...")
+    # 두 번째 인자로 시장을 지정하면 그 시장만 실행 (예: python main.py auto kr)
+    only = sys.argv[2] if len(sys.argv) > 2 else None
+    configs = {only: ALL_CONFIGS[only]} if only in ALL_CONFIGS else ALL_CONFIGS
+    print(f"Running screener [{run_type}] — 시장: {', '.join(configs)}")
 
     all_market_results = {}
     all_prices = {}
 
-    # ── 3개 시장 순차 실행 ─────────────────────────────────
-    for market_key, cfg in ALL_CONFIGS.items():
+    for market_key, cfg in configs.items():
         results, prices = screener.run(cfg)
         all_prices[market_key] = prices
 
@@ -88,7 +90,7 @@ def main():
     # 추가 조회가 없다.
     print("\n실전 성적표 계산 중...")
     try:
-        scorecards = tracker.build(firebase_upload.get_db(), all_prices, list(ALL_CONFIGS))
+        scorecards = tracker.build(firebase_upload.get_db(), all_prices, list(configs))
     except Exception as e:
         print(f"  성적표 실패: {e}")
         scorecards = {}
@@ -104,7 +106,7 @@ def main():
     # 이미 오른 종목의 과거를 재는 셈이라 승률이 부풀려짐
     all_backtest = {}
 
-    for market_key, cfg in ALL_CONFIGS.items():
+    for market_key, cfg in configs.items():
         print(f"\n[{cfg['name']}] 백테스트 실행 중...")
         try:
             all_backtest[market_key] = backtest.run(cfg)
