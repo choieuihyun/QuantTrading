@@ -232,9 +232,11 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         # ── 원전 기법용 구조 탐지 ─────────────────────────────
         h_np, l_np, c_np, v_np = (high.to_numpy(dtype=float), low.to_numpy(dtype=float),
                                   close.to_numpy(dtype=float), volume.to_numpy(dtype=float))
-        box  = patterns.darvas_box(h_np, l_np, c_np)
+        box  = patterns.darvas_box(h_np, l_np, c_np,
+                                   max_width=cfg.get("box_max_width", patterns.BOX_MAX_WIDTH))
         vcp  = patterns.vcp_state(h_np, l_np, c_np, v_np)
-        rng  = patterns.trading_range(h_np, l_np)
+        rng  = patterns.trading_range(h_np, l_np,
+                                      max_width=cfg.get("base_max_width", patterns.BASE_MAX_WIDTH))
         wyck = patterns.wyckoff_state(h_np, l_np, c_np, v_np, rng)
 
         # Weinstein Stage 2 진입 = 베이스 저항을 거래량 동반해 돌파. 이미 오른 상태가 아니라 '전환'.

@@ -42,6 +42,11 @@ KR_CONFIG = {
     "rsi_overbought":  80,
     "rsi_pb_min":      35,
     "rsi_pb_max":      55,
+
+    # ── 구조 탐지 폭 (시장 변동성에 맞춤) ─────────────────
+    # 같은 25%도 코스닥에선 좁은 박스, S&P500 대형주에선 넓은 박스다.
+    "box_max_width":   0.25,
+    "base_max_width":  0.30,
 }
 
 US_CONFIG = {
@@ -80,6 +85,10 @@ US_CONFIG = {
     "rsi_overbought":  80,
     "rsi_pb_min":      35,
     "rsi_pb_max":      55,
+
+    # 대형주는 변동성이 낮아 같은 폭이면 박스가 남발된다 (실측: KR 2.5% vs US 67%)
+    "box_max_width":   0.15,
+    "base_max_width":  0.20,
 }
 
 CRYPTO_CONFIG = {
@@ -119,6 +128,9 @@ CRYPTO_CONFIG = {
     "rsi_overbought":  85,
     "rsi_pb_min":      30,
     "rsi_pb_max":      55,
+
+    "box_max_width":   0.40,   # 변동성이 커 폭을 넓게 잡지 않으면 박스가 안 잡힌다
+    "base_max_width":  0.50,
 }
 
 CRYPTO_TICKERS = [

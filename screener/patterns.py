@@ -80,11 +80,11 @@ def contractions(high: np.ndarray, low: np.ndarray, volume: np.ndarray,
     return sorted(dedup.values(), key=lambda x: x["low_i"])
 
 
-def vcp_state(high, low, close, volume) -> dict:
+def vcp_state(high, low, close, volume, window: int = VCP_WINDOW) -> dict:
     """
     연속 수축이 성립하는지와 피벗(마지막 수축의 고점) 위치.
     """
-    legs = contractions(high, low, volume)
+    legs = contractions(high, low, volume, window)
     out = {
         "vcp_legs": len(legs),
         "vcp_tightening": False,
