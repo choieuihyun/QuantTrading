@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Search, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchScorecardIndex, fetchScorecard } from "@/lib/fetcher";
+import { fetchScorecardIndex, fetchScorecard, fetchTickerHistory } from "@/lib/fetcher";
 import { PATTERN_GUIDE } from "@/lib/patternGuide";
-import type { MarketKey, PatternKey, ScorePick } from "@/lib/types";
+import type { MarketKey, PatternKey, ScorePick, ScorecardDoc } from "@/lib/types";
 
 const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
   { key: "kr",     label: "한국",   flag: "🇰🇷" },
@@ -55,6 +55,10 @@ export default function TrackPage() {
   const [pattern, setPattern] = useState<PatternKey>("common_trend");
   const [dateIdx, setDateIdx] = useState<number | null>(null);
   const [q, setQ] = useState("");
+  /** byDate = 날짜 하나의 리스트 / byTicker = 종목 하나를 전 기간에서 추적 */
+  const [mode, setMode] = useState<"byDate" | "byTicker">("byDate");
+  const [tq, setTq] = useState("");
+  const [query, setQuery] = useState("");
 
   const { data: index, isLoading: idxLoading } = useSWR(
     ["scoreIndex", market], () => fetchScorecardIndex(market),
@@ -78,6 +82,34 @@ export default function TrackPage() {
   const { data: doc, isLoading: docLoading } = useSWR(
     selected ? ["score", market, selected.date] : null,
     () => fetchScorecard(market, selected!.date));
+
+  const allDates = useMemo(() => dates.map((d) => d.date), [dates]);
+  const { data: history, isLoading: histLoading } = useSWR(
+    mode === "byTicker" && query && allDates.length ? ["hist", market, query] : null,
+    () => fetchTickerHistory(market, allDates));
+
+  /** 검색어에 걸리는 종목이 언제 어느 패턴에 떴는지 — 최신 날짜부터 */
+  const hits = useMemo(() => {
+    if (!history || !query) return [];
+    const needle = query.trim().toLowerCase();
+    const rows: { date: string; pattern: string; pick: ScorePick }[] = [];
+    for (const d of history as ScorecardDoc[]) {
+      for (const [pat, blk] of Object.entries(d.patterns ?? {})) {
+        for (const pk of blk.picks ?? []) {
+          if (pk.name.toLowerCase().includes(needle) || pk.ticker.includes(needle)) {
+            rows.push({ date: d.date, pattern: pat, pick: pk });
+          }
+        }
+      }
+    }
+    return rows.sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [history, query]);
+
+  const hitNames = useMemo(
+    () => Array.from(new Set(hits.map((h) => `${h.pick.name} (${h.pick.ticker})`))),
+    [hits]);
+  const hitRets = hits.map((h) => h.pick.ret).filter((r): r is number => r != null);
+  const hitAvg = hitRets.length ? hitRets.reduce((a, b) => a + b, 0) / hitRets.length : null;
 
   const block = doc?.patterns?.[pattern];
 
@@ -128,6 +160,22 @@ export default function TrackPage() {
               <span>{flag}</span>{label}
             </button>
           ))}
+
+          <div className="ml-auto flex gap-1 self-center">
+            {([["byDate", "날짜별 리스트"], ["byTicker", "종목 조회"]] as const).map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-xs transition-all border ${
+                  mode === m
+                    ? "bg-indigo-500/20 border-indigo-500/40 text-white"
+                    : "bg-transparent border-white/10 text-white/40 hover:text-white/70"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {idxLoading ? (
@@ -139,6 +187,113 @@ export default function TrackPage() {
               과거 스크리닝 기록을 모아 계산하므로, 다음 자동 실행(08:30 / 18:00) 이후에 표시됩니다.
             </div>
           </div>
+        ) : mode === "byTicker" ? (
+          <>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+              <label className="text-xs text-white/40 uppercase tracking-wider">종목 조회</label>
+              <p className="text-xs text-white/30 mt-1 mb-2.5">
+                이 종목이 <strong className="text-white/50">언제 · 어느 패턴에</strong> 떴고
+                그 뒤 얼마 났는지 전 기간에서 찾습니다.
+              </p>
+              <form
+                onSubmit={(e) => { e.preventDefault(); setQuery(tq); }}
+                className="flex gap-2 max-w-md"
+              >
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={tq}
+                    onChange={(e) => setTq(e.target.value)}
+                    placeholder="종목명 또는 코드 (예: 삼성전자, 005930)"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2
+                               text-sm placeholder:text-white/25 focus:outline-none focus:border-white/25"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg text-sm border border-indigo-500/40
+                             bg-indigo-500/20 text-white hover:bg-indigo-500/30 transition-colors"
+                >
+                  조회
+                </button>
+              </form>
+            </div>
+
+            {!query ? (
+              <div className="py-20 text-center text-white/30 text-sm">
+                종목명이나 코드를 입력하고 조회를 누르세요.
+              </div>
+            ) : histLoading ? (
+              <Skeleton className="h-96 bg-white/5 rounded-2xl" />
+            ) : hits.length === 0 ? (
+              <div className="py-20 text-center text-white/30 text-sm">
+                최근 {dates.length}개 진입일 어디에도 <b className="text-white/50">{query}</b> 가 뜬 적이 없습니다.
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Stat label="선정 횟수" value={`${hits.length}회`}
+                        sub={`${new Set(hits.map(h => h.date)).size}개 날짜 · ${new Set(hits.map(h => h.pattern)).size}개 패턴`} />
+                  <Stat label="평균 수익률" value={pct(hitAvg)}
+                        sub={`플러스 ${hitRets.filter(r => r > 0).length}/${hitRets.length}`}
+                        color={tone(hitAvg)} />
+                  <Stat label="최고" value={pct(hitRets.length ? Math.max(...hitRets) : null)} color="text-emerald-400" />
+                  <Stat label="최저" value={pct(hitRets.length ? Math.min(...hitRets) : null)} color="text-rose-400" />
+                </div>
+
+                {hitNames.length > 1 && (
+                  <p className="text-xs text-white/40">
+                    일치 종목 {hitNames.length}개: {hitNames.join(" · ")}
+                  </p>
+                )}
+
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-white/40 uppercase tracking-wider border-b border-white/10">
+                          <th className="text-left  font-medium px-4 py-3">진입일</th>
+                          <th className="text-left  font-medium px-3 py-3">패턴</th>
+                          <th className="text-left  font-medium px-3 py-3">종목</th>
+                          <th className="text-right font-medium px-3 py-3">점수</th>
+                          <th className="text-right font-medium px-3 py-3">그날 가격</th>
+                          <th className="text-right font-medium px-3 py-3">현재가</th>
+                          <th className="text-right font-medium px-3 py-3">수익률</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {hits.map((h, i) => (
+                          <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                            <td className="px-4 py-2.5 font-mono text-white/70">{h.date}</td>
+                            <td className="px-3 py-2.5 text-white/60 text-xs">
+                              {PATTERN_GUIDE[h.pattern as PatternKey]?.title ?? h.pattern}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="text-white/90">{h.pick.name}</div>
+                              <div className="text-xs text-white/30 font-mono">{h.pick.ticker}</div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono text-white/50">{h.pick.score ?? "—"}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-white/60">{num(h.pick.entry)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-white/60">
+                              {h.pick.gone ? <span className="text-amber-400/60 text-xs">거래없음</span> : num(h.pick.now)}
+                            </td>
+                            <td className={`px-3 py-2.5 text-right font-mono font-semibold ${tone(h.pick.ret)}`}>
+                              {pct(h.pick.ret)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <p className="text-xs text-white/25 leading-relaxed">
+                  같은 종목이 여러 날·여러 패턴에 중복해 뜰 수 있습니다. 각 행은 <b>그 날짜에 샀다면</b>의
+                  결과이므로 평균은 참고치입니다 — 실제로 그만큼 여러 번 사는 건 아닙니다.
+                </p>
+              </>
+            )}
+          </>
         ) : (
           <>
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">

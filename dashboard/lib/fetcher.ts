@@ -28,6 +28,20 @@ export async function fetchScorecardIndex(market: MarketKey): Promise<ScorecardI
   return snap.exists() ? (snap.data() as ScorecardIndex) : null;
 }
 
+/**
+ * 종목 하나를 전 기간·전 패턴에서 추적.
+ * 날짜별로 문서가 쪼개져 있어 전부 읽어야 한다 — 40일치라 한 번에 받아도 부담 없다.
+ */
+export async function fetchTickerHistory(
+  market: MarketKey,
+  dates: string[]
+): Promise<ScorecardDoc[]> {
+  const docs = await Promise.all(
+    dates.map((d) => getDoc(doc(db, "scorecard", `${market}_${d}`)))
+  );
+  return docs.filter((s) => s.exists()).map((s) => s.data() as ScorecardDoc);
+}
+
 /** 특정 진입일의 패턴별 종목 성적. 날짜당 문서가 나뉘어 있다. */
 export async function fetchScorecard(
   market: MarketKey,
