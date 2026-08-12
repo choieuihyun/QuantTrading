@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 from screener import (
-    calc_signals_from_df, drop_partial_bar, get_universe, score_pattern,
+    calc_signals_from_df, drop_partial_bar, sanitize_ohlc, get_universe, score_pattern,
     TREND_PATTERN_KEYS, ACCUM_PATTERN_KEYS, CUSTOM_PATTERN_KEYS,
     SCORE_THRESHOLD, _last_weekday,
 )
@@ -187,7 +187,8 @@ def run(cfg: dict, sample_size: int = BT_SAMPLE) -> dict:
     def fetch_hist(ticker: str):
         try:
             df = fdr.DataReader(ticker, start_date)
-            df = drop_partial_bar(df, cfg)
+            # 거래정지일 시/고/저 0을 종가로 채움 — 저가 0이 손절 도달로 잡혀 0원 청산되는 것 방지
+            df = sanitize_ohlc(drop_partial_bar(df, cfg))
             return ticker, df if not df.empty else None
         except Exception:
             return ticker, None

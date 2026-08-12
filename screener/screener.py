@@ -21,6 +21,29 @@ def _calc_rsi(close: pd.Series, period=14) -> float:
     return float((100 - 100 / (1 + rs)).iloc[-1])
 
 
+def sanitize_ohlc(hist: pd.DataFrame) -> pd.DataFrame:
+    """
+    거래정지일에 FinanceDataReader는 시/고/저를 0으로 주고 종가만 직전 값으로 유지한다.
+    그대로 두면 저가 0이 손절 도달로 잡혀 0원 청산(-100%)이 되고, ATR과 52주 저점도 망가진다.
+    가격이 멈춘 날이므로 종가로 채운다.
+    """
+    if hist.empty:
+        return hist
+    cols = [c for c in ("Open", "High", "Low") if c in hist.columns]
+    if "Close" not in hist.columns or not cols:
+        return hist
+
+    hist = hist[hist["Close"] > 0]
+    bad = (hist[cols] <= 0).any(axis=1)
+    if not bad.any():
+        return hist
+
+    hist = hist.copy()
+    for c in cols:
+        hist.loc[bad, c] = hist.loc[bad, "Close"]
+    return hist
+
+
 def drop_partial_bar(hist: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """24/7 시장은 진행 중인 당일 봉의 거래량이 미완성이라 vol_ratio가 왜곡됨"""
     if not cfg.get("drop_partial_bar") or hist.empty:
@@ -49,6 +72,12 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
     try:
         if hist.empty or len(hist) < MIN_BARS:
             return None
+
+        # 창 길이가 달라지면 OBV cumsum 기준선과 pos_52w 구간이 달라져 라이브와 재현이
+        # 서로 다른 신호를 낸다. 두 경로 모두 여기서 동일한 봉 수로 잘라 쓴다.
+        lookback = cfg.get("lookback_bars")
+        if lookback and len(hist) > lookback:
+            hist = hist.iloc[-lookback:]
 
         close  = hist["Close"]
         volume = hist["Volume"]
@@ -93,9 +122,15 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         bb_squeeze = float(bb_width.iloc[-1]) <= float(bb_width.iloc[-60:].quantile(0.25))
 
         # ── OBV ──────────────────────────────────────────────
+        # cumsum은 넘겨받은 창의 첫 봉을 0으로 잡으므로 OBV 절대값은 창 길이에 따라 달라진다.
+        # 신고점 판정을 "최고값 × 0.98"로 하면 그 기준선이 같이 움직여 라이브와 백테스트가
+        # 서로 다른 값을 낸다. 60일 변동폭 대비 상대 위치로 바꿔 창 길이와 무관하게 만든다.
         obv = (close.diff().apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0)) * volume).cumsum()
+        obv_win      = obv.iloc[-60:]
+        obv_max      = float(obv_win.max())
+        obv_range    = obv_max - float(obv_win.min())
         obv_rising   = float(obv.iloc[-1]) > float(obv.iloc[-20])
-        obv_new_high = float(obv.iloc[-1]) >= float(obv.iloc[-60:].max()) * 0.98
+        obv_new_high = (obv_range <= 0) or (float(obv.iloc[-1]) >= obv_max - 0.02 * obv_range)
 
         # ── 거래량 ───────────────────────────────────────────
         vol_avg_20 = float(volume.iloc[-20:].mean())
@@ -208,7 +243,7 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
 def _get_signals(ticker: str, start_date: str, market_return: float, cfg: dict = None) -> dict | None:
     try:
         hist = fdr.DataReader(ticker, start_date)
-        hist = drop_partial_bar(hist, cfg or {})
+        hist = sanitize_ohlc(drop_partial_bar(hist, cfg or {}))
         return calc_signals_from_df(hist, market_return, cfg=cfg)
     except Exception:
         return None
@@ -517,6 +552,10 @@ def run(cfg: dict = None) -> dict:
         return {k: pd.DataFrame() for k in ALL_PATTERN_KEYS + ["common_trend", "common_accum", "common_all"]}
 
     all_df = pd.DataFrame(results)
+
+    # as_completed는 완료 순서라 동점 종목의 화면 순서가 실행마다 달라진다.
+    # 게이트만 넘으면 만점이 되는 패턴은 상위 30이 통째로 동점이라 목록 자체가 바뀐다.
+    all_df = all_df.sort_values("ticker").reset_index(drop=True)
 
     tradable = all_df["is_tradable"] & (all_df["avg_value_20"] >= (cfg.get("min_trading_value") or 0))
     print(f"거래 가능 필터: {len(all_df)} → {int(tradable.sum())}종목 (거래정지/저유동성 제외)")
