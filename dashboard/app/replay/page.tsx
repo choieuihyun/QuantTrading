@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
+import { DataError } from "@/components/DataError";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchReplay } from "@/lib/fetcher";
 import { PATTERN_GUIDE } from "@/lib/patternGuide";
@@ -63,7 +64,7 @@ export default function ReplayPage() {
   const [topK, setTopK] = useState(30);
   const [noStop, setNoStop] = useState(false);
 
-  const { data, isLoading } = useSWR(["replay", market], () => fetchReplay(market));
+  const { data, isLoading, error } = useSWR(["replay", market], () => fetchReplay(market));
 
   const suffix = noStop ? "|nostop" : "";
   const rows = data
@@ -143,6 +144,8 @@ export default function ReplayPage() {
           <div className="space-y-4">
             {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-64 bg-white/5 rounded-2xl" />)}
           </div>
+        ) : error ? (
+          <DataError err={error} collection="replay_results" />
         ) : !data ? (
           <div className="py-24 text-center text-white/30">
             이 시장의 재현 데이터가 없습니다.

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/Header";
+import { DataError } from "@/components/DataError";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchScorecardIndex, fetchScorecard, fetchTickerHistory } from "@/lib/fetcher";
 import { PATTERN_GUIDE } from "@/lib/patternGuide";
@@ -60,7 +61,7 @@ export default function TrackPage() {
   const [tq, setTq] = useState("");
   const [query, setQuery] = useState("");
 
-  const { data: index, isLoading: idxLoading } = useSWR(
+  const { data: index, isLoading: idxLoading, error: idxError } = useSWR(
     ["scoreIndex", market], () => fetchScorecardIndex(market),
     { refreshInterval: 1000 * 60 * 10 });
 
@@ -180,6 +181,8 @@ export default function TrackPage() {
 
         {idxLoading ? (
           <Skeleton className="h-72 bg-white/5 rounded-2xl" />
+        ) : idxError ? (
+          <DataError err={idxError} collection="scorecard" />
         ) : !index || !dates.length ? (
           <div className="py-20 text-center">
             <div className="text-white/40">아직 성적표가 없습니다.</div>

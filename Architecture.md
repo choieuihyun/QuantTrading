@@ -83,6 +83,20 @@ screener.yml이 하는 일 (순서대로):
       ※ 대시보드가 종목 모달에서 지연 로딩 → Firestore 규칙에 읽기 허용 필요
 ```
 
+**Firestore 보안 규칙** — 새 컬렉션을 추가하면 반드시 읽기 권한도 열어야 한다.
+빠뜨리면 데이터는 저장되는데 브라우저가 `permission-denied`로 못 읽어, 화면상으로는
+"데이터 없음"과 구별되지 않는다 (실제로 `scorecard`·`replay_*`·`fundamentals`에서 겪음).
+
+```
+match /screener_results/{doc} { allow read: if true; allow write: if false; }
+match /fundamentals/{doc}     { allow read: if true; allow write: if false; }
+match /scorecard/{doc}        { allow read: if true; allow write: if false; }
+match /replay_results/{doc}   { allow read: if true; allow write: if false; }
+match /replay_picks/{doc}     { allow read: if true; allow write: if false; }
+```
+
+쓰기는 열지 않는다 — Actions는 서비스 계정 키로 쓰므로 이 규칙의 적용을 받지 않는다.
+
 **주의 — DART 데이터 성격 차이 (실측 확인)**
 - 손익계산서(IS/CIS) `thstrm_amount` = **당기 3개월 단독값** → 차감 불필요
 - 현금흐름표(CF) `thstrm_amount` = **기초부터 누적값** → 분기 단독값은 차감 필요
