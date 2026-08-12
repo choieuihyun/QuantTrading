@@ -98,10 +98,34 @@ export function StockTable({ data, pattern, universe }: Props) {
   // 펀더멘털은 기본 노출(리스트에서 바로 봐야 하는 지표), 기술지표는 접어서 폭을 줄인다
   const [showTech, setShowTech] = useState(false);
   const [showFund, setShowFund] = useState(true);
+  const [showFlow, setShowFlow] = useState(true);
 
   const extraCols = PATTERN_COLS[pattern];
   const extraLabels = PATTERN_LABELS[pattern];
   const hasFundamentals = data.some((s) => isNum(s.per) || isNum(s.roe));
+  // 외인·기관 수급은 한국 전용이라 없는 시장에서는 토글 자체를 숨긴다
+  const hasFlow = data.some((s) => isNum(s.foreign_net_20d_pct) || isNum(s.inst_net_20d_pct));
+
+  /** 시총 대비 순매수 비율. 원화 절대액은 대형주가 항상 이겨 종목 간 비교가 안 된다. */
+  const flowCols: ColumnDef<Stock>[] = [
+    { key: "foreign_net_20d_pct", label: "외인 20일" },
+    { key: "inst_net_20d_pct",    label: "기관 20일" },
+    { key: "foreign_net_60d_pct", label: "외인 60일" },
+    { key: "inst_net_60d_pct",    label: "기관 60일" },
+  ].map(({ key, label }) => ({
+    accessorKey: key,
+    header: label,
+    cell: ({ getValue }: { getValue: () => unknown }) => {
+      const v = getValue();
+      if (!isNum(v)) return <span className="text-xs text-white/25">-</span>;
+      const p = (v as number) * 100;
+      return (
+        <span className={`font-mono text-xs ${p > 0 ? "text-emerald-400" : p < 0 ? "text-rose-400" : "text-white/40"}`}>
+          {p > 0 ? "+" : ""}{p.toFixed(2)}%
+        </span>
+      );
+    },
+  }));
 
   const techCols: ColumnDef<Stock>[] = [
     {
@@ -182,6 +206,7 @@ export function StockTable({ data, pattern, universe }: Props) {
     },
     ...(showTech ? techCols : []),
     ...(showFund && hasFundamentals ? fundCols : []),
+    ...(showFlow && hasFlow ? flowCols : []),
     ...extraCols.map((key) => ({
       accessorKey: key as string,
       header: extraLabels[key as string],
@@ -218,6 +243,9 @@ export function StockTable({ data, pattern, universe }: Props) {
           <ColToggle on={showTech} onClick={() => setShowTech((v) => !v)} label="기술지표" />
           {hasFundamentals && (
             <ColToggle on={showFund} onClick={() => setShowFund((v) => !v)} label="펀더멘털" />
+          )}
+          {hasFlow && (
+            <ColToggle on={showFlow} onClick={() => setShowFlow((v) => !v)} label="외인·기관" />
           )}
         </div>
       </div>

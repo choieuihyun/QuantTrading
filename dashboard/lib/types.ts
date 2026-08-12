@@ -1,4 +1,14 @@
 export interface Stock {
+  /** 외국인·기관 순매수 (KR 전용). 시총 대비 비율(_pct)이 종목 간 비교 가능한 값이다 */
+  foreign_net_20d?: number | null;
+  inst_net_20d?: number | null;
+  foreign_net_60d?: number | null;
+  inst_net_60d?: number | null;
+  foreign_net_20d_pct?: number | null;
+  inst_net_20d_pct?: number | null;
+  foreign_net_60d_pct?: number | null;
+  inst_net_60d_pct?: number | null;
+
   ticker: string;
   name: string;
   market: string;

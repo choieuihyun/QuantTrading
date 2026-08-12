@@ -5,6 +5,7 @@ import firebase_upload
 import dart_fetcher
 import backtest
 import tracker
+import investor_flow
 from market_config import ALL_CONFIGS
 
 PATTERN_NAMES = {
@@ -75,6 +76,14 @@ def main():
                         results[key] = _apply_canslim_c(key, dart_fetcher.add_valuation(merged))
                 # 분기 재무 히스토리는 별도 컬렉션으로 저장 (재고 사이클/차트용)
                 firebase_upload.save_fundamentals(histories)
+
+        # 외인·기관 수급 (KR 전용) — 가격에서 파생되지 않은 유일한 독립 축
+        if market_key == "kr" and investor_flow.available():
+            print("\n외인·기관 순매수 수집 중...")
+            try:
+                results = investor_flow.attach(results, investor_flow.fetch())
+            except Exception as e:
+                print(f"  수급 수집 실패: {e}")
 
         all_market_results[market_key] = results
 
