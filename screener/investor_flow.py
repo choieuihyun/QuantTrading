@@ -150,8 +150,14 @@ if __name__ == "__main__":
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip("'\""))
 
+    # .env도 환경변수도 없으면 직접 입력받는다 — 비밀번호가 셸 히스토리에 남지 않게
+    if not available():
+        import getpass
+        os.environ["KRX_ID"] = input("KRX 아이디: ").strip()
+        os.environ["KRX_PW"] = getpass.getpass("KRX 비밀번호(화면에 안 보임): ")
+
     ok, why = check_login()
-    print(f"로그인 확인: {'성공' if ok else '실패'} — {why}")
+    print(f"\n로그인 확인: {'성공' if ok else '실패'} — {why}")
     if not ok:
         raise SystemExit(1)
 
