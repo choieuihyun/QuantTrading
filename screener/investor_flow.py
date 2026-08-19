@@ -52,6 +52,12 @@ def check_login() -> tuple[bool, str]:
                          "mbrId": os.environ["KRX_ID"], "pw": os.environ["KRX_PW"]},
                    headers={"User-Agent": auth.USER_AGENT, "Referer": auth.LOGIN_PAGE},
                    timeout=15)
+        # Akamai 엣지가 데이터센터 IP를 막으면 JSON이 아니라 HTML "Access Denied"가 온다.
+        # 자격증명 문제로 오해하면 Secrets만 계속 고치게 된다.
+        if "Access Denied" in r.text or "<HTML" in r.text[:200].upper():
+            return False, ("KRX가 이 IP를 차단했습니다 (Akamai 엣지). GitHub Actions 등 "
+                           "데이터센터 IP에서는 자격증명과 무관하게 접속되지 않습니다. "
+                           "로컬 PC에서는 됩니다.")
         d = r.json()
     except Exception as e:
         return False, f"로그인 요청 실패: {type(e).__name__} {e}"

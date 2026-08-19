@@ -666,6 +666,52 @@ EXTRA_COLS = {
 }
 
 
+# KRX 종목 리스트를 KRX 서버를 거치지 않고 받는 경로.
+#
+# fdr.StockListing("KOSPI")는 "최신 영업일이 언제냐"만 data.krx.co.kr에 물어보고
+# 실제 CSV는 GitHub 미러에서 받는다. 그런데 KRX가 Akamai 엣지에서 데이터센터 IP를
+# 차단해(2026-08, "Access Denied") GitHub Actions에서는 그 한 번의 조회가 403이 되고
+# 종목 리스트 자체를 못 받아 KR 스크리닝이 통째로 죽는다.
+# 날짜를 오늘부터 거꾸로 훑어 찾으면 KRX를 아예 안 거친다.
+KRX_MIRROR = ("https://raw.githubusercontent.com/FinanceData/fdr_krx_data_cache"
+              "/refs/heads/master/data/listing/krx/{date}.csv")
+KRX_MARKET_ID = {"KOSPI": "STK", "KOSDAQ": "KSQ", "KONEX": "KNX"}
+_krx_cache: dict = {}
+
+
+def krx_listing(market: str, max_back: int = 14) -> pd.DataFrame:
+    """market: KOSPI | KOSDAQ | KONEX. 실패 시 fdr.StockListing으로 되돌아간다."""
+    if "df" not in _krx_cache:
+        import requests
+        today = datetime.today().date()
+        for i in range(max_back):
+            day = (today - timedelta(days=i)).isoformat()
+            try:
+                r = requests.get(KRX_MIRROR.format(date=day), timeout=20)
+            except Exception:
+                continue
+            if r.status_code != 200:
+                continue
+            import io
+            _krx_cache["df"] = pd.read_csv(
+                io.StringIO(r.text), index_col=0,
+                dtype={"Code": str, "Dept": str, "ChangeCode": str, "MarketId": str})
+            _krx_cache["date"] = day
+            print(f"KRX 종목 리스트: GitHub 미러 {day} ({len(_krx_cache['df'])}종목)")
+            break
+        else:
+            print(f"KRX 미러에서 최근 {max_back}일치를 못 찾음 — fdr.StockListing으로 시도")
+            _krx_cache["df"] = None
+
+    df = _krx_cache.get("df")
+    if df is None:
+        return fdr.StockListing(market)
+
+    mid = KRX_MARKET_ID.get(market)
+    out = df if mid is None else df[df["MarketId"] == mid]
+    return out.reset_index(drop=True)
+
+
 def get_universe(cfg: dict) -> list[dict]:
     """스크리닝 대상 종목 리스트 — 백테스트도 동일 유니버스를 사용"""
     from market_config import CRYPTO_TICKERS
@@ -676,7 +722,7 @@ def get_universe(cfg: dict) -> list[dict]:
 
     frames = []
     for market in cfg["markets"]:
-        df_mkt = fdr.StockListing(market)
+        df_mkt = krx_listing(market) if market in KRX_MARKET_ID else fdr.StockListing(market)
         df_mkt["market"] = market
         frames.append(df_mkt)
 
