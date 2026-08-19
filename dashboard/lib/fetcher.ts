@@ -3,6 +3,7 @@ import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
   ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
+  SignalIndex, SignalShard,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -76,4 +77,28 @@ export async function fetchFundamentals(ticker: string): Promise<Fundamentals | 
 export async function fetchPrices(market: MarketKey): Promise<PriceDoc | null> {
   const snap = await getDoc(doc(db, "prices", market));
   return snap.exists() ? (snap.data() as PriceDoc) : null;
+}
+
+/**
+ * 종목 조회용 샤드 키. screener/explain.py의 shard_of와 반드시 같은 식이어야 한다.
+ * 한국 종목코드는 끝자리가 전부 0이라 마지막 글자로 나누면 한 샤드에 전부 몰린다.
+ */
+export function shardOf(ticker: string, shards: number): number {
+  let sum = 0;
+  for (const ch of ticker) sum += ch.codePointAt(0)!;
+  return sum % shards;
+}
+
+export async function fetchSignalIndex(market: MarketKey): Promise<SignalIndex | null> {
+  const snap = await getDoc(doc(db, "signals", `${market}_index`));
+  return snap.exists() ? (snap.data() as SignalIndex) : null;
+}
+
+/** 검색한 종목이 속한 샤드 하나만 읽는다 — 전 종목은 한 문서에 안 들어간다. */
+export async function fetchSignalShard(
+  market: MarketKey,
+  shard: number
+): Promise<SignalShard | null> {
+  const snap = await getDoc(doc(db, "signals", `${market}_${shard}`));
+  return snap.exists() ? (snap.data() as SignalShard) : null;
 }

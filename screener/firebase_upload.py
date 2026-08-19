@@ -157,6 +157,34 @@ def save_prices(price_maps: dict, names: dict = None, meta: dict = None):
         print(f"Uploaded → prices/{market} ({len(prices)}종목)")
 
 
+def save_signals(market: str, shards: dict, labels: dict, bar_date: str, threshold: float):
+    """
+    종목별 패턴 판정 — "이 종목이 왜 목록에 없지?"에 답하는 데이터.
+
+    전 종목 × 11패턴 × 조건별 실측값은 한 문서(1MB)를 넘어 샤드로 쪼갠다.
+    화면은 검색한 종목이 속한 샤드 하나만 읽으면 된다.
+    """
+    if not shards:
+        return
+    _init_app()
+    db = firestore.client()
+
+    batch = db.batch()
+    for i, rows in shards.items():
+        batch.set(db.collection("signals").document(f"{market}_{i}"),
+                  {"bar_date": bar_date, "tickers": rows})
+    batch.set(db.collection("signals").document(f"{market}_index"), {
+        "bar_date": bar_date,
+        "run_at": datetime.now(timezone.utc),
+        "threshold": threshold,
+        "shards": len(shards),
+        "labels": labels,
+        "count": sum(len(r) for r in shards.values()),
+    })
+    batch.commit()
+    print(f"Uploaded → signals/{market}_* ({sum(len(r) for r in shards.values())}종목 / {len(shards)}샤드)")
+
+
 def attach_backtest(run_type: str, backtest: dict):
     """백테스트는 스크리닝 업로드 후에 끝나므로 같은 문서에 나중에 덧붙인다"""
     _init_app()

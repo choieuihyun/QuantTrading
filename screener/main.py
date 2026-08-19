@@ -6,6 +6,7 @@ import dart_fetcher
 import backtest
 import tracker
 import investor_flow
+import explain
 from market_config import ALL_CONFIGS
 
 PATTERN_NAMES = {
@@ -118,6 +119,19 @@ def main():
         firebase_upload.save_prices(all_prices, all_names, all_meta)
     except Exception as e:
         print(f"  시세 업로드 실패: {e}")
+
+    # 종목 조회 — 상위 20위 밖 종목이 왜 안 떴는지 설명하려면 전 종목 판정이 필요하다
+    for market_key, cfg in configs.items():
+        rows = (all_meta.get(market_key) or {}).get("rows") or []
+        if not rows:
+            continue
+        try:
+            thr = cfg.get("score_threshold", screener.SCORE_THRESHOLD)
+            firebase_upload.save_signals(
+                market_key, explain.build_shards(rows, cfg, thr), explain.labels(),
+                all_meta[market_key].get("bar_date"), thr)
+        except Exception as e:
+            print(f"  [{market_key}] 종목 판정 업로드 실패: {e}")
 
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
     # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면

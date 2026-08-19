@@ -326,3 +326,29 @@ export interface Position {
   exitDate?: string | null;
   exitPrice?: number | null;
 }
+
+/** signals/{market}_index — 종목 조회용 메타. 조건 라벨은 종목마다 같아 여기 한 번만 둔다 */
+export interface SignalIndex {
+  bar_date: string;
+  run_at: { seconds: number };
+  threshold: number;
+  shards: number;
+  count: number;
+  /** 패턴 → 게이트 조건 라벨. 종목 데이터의 조건 배열과 순서가 1:1 대응한다 */
+  labels: Record<string, string[]>;
+}
+
+/** [상태, 점수, 조건배열] — 조건은 [통과여부, 실측값]. common_*는 조건 대신 적중 패턴 목록 */
+export type SignalState = "x" | "g" | "l" | "p";
+export type SignalEntry = [SignalState, number, [number, string][] | string[]];
+
+export interface SignalRow {
+  /** 대상 제외 사유. 있으면 패턴 판정 자체를 안 한다 */
+  x?: string;
+  p?: Record<string, SignalEntry>;
+}
+
+export interface SignalShard {
+  bar_date: string;
+  tickers: Record<string, SignalRow>;
+}

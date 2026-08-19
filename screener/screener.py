@@ -823,5 +823,7 @@ def run(cfg: dict = None) -> dict:
     names = {str(t): str(n) for t, n in zip(all_df["ticker"], all_df["name"])}
     # 종목마다 상장·거래정지로 마지막 봉이 다를 수 있어 최빈값을 시장 기준일로 쓴다
     bar_date = all_df["bar_date"].mode()
-    meta = {"bar_date": str(bar_date.iloc[0]) if len(bar_date) else None}
+    meta = {"bar_date": str(bar_date.iloc[0]) if len(bar_date) else None,
+            # 종목 조회 화면이 상위 20위 밖 종목도 설명할 수 있으려면 전 종목 신호가 필요하다
+            "rows": all_df.to_dict("records")}
     return output, prices, names, meta
