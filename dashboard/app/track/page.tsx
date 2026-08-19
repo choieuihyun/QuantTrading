@@ -276,7 +276,15 @@ export default function TrackPage() {
                               <div className="text-xs text-white/30 font-mono">{h.pick.ticker}</div>
                             </td>
                             <td className="px-3 py-2.5 text-right font-mono text-white/50">{h.pick.score ?? "—"}</td>
-                            <td className="px-3 py-2.5 text-right font-mono text-white/60">{num(h.pick.entry)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-white/60">
+                              {num(h.pick.entry)}
+                              {h.pick.adjusted && (
+                                <span
+                                  title={`분할·증자 조정됨 — 당시 표시가 ${num(h.pick.stored_entry)}`}
+                                  className="ml-1 text-[10px] text-sky-300/80 align-super"
+                                >조정</span>
+                              )}
+                            </td>
                             <td className="px-3 py-2.5 text-right font-mono text-white/60">
                               {h.pick.gone ? <span className="text-amber-400/60 text-xs">거래없음</span> : num(h.pick.now)}
                             </td>
@@ -396,6 +404,13 @@ export default function TrackPage() {
                   <Stat label="최저" value={pct(block.worst)} color="text-rose-400" />
                 </div>
 
+                {(block.adjusted ?? 0) > 0 && (
+                  <p className="text-xs text-sky-300/70 mb-2">
+                    {block.adjusted}종목은 진입일 이후 액면분할·무상증자가 있어 진입가를
+                    조정 후 기준으로 다시 계산했습니다. 점수·RSI·52주위치는 그날 값 그대로라
+                    조정 전 기준입니다.
+                  </p>
+                )}
                 {block.gone > 0 && (
                   <div className="flex items-center gap-2 text-xs text-amber-200/70 px-1">
                     <AlertTriangle size={13} />
@@ -427,7 +442,15 @@ export default function TrackPage() {
                             <td className="px-3 py-2.5 text-right font-mono text-white/50">
                               {p.score ?? "—"}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-mono text-white/60">{num(p.entry)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-white/60">
+                              {num(p.entry)}
+                              {p.adjusted && (
+                                <span
+                                  title={`분할·증자 조정됨 — 당시 표시가 ${num(p.stored_entry)}`}
+                                  className="ml-1 text-[10px] text-sky-300/80 align-super"
+                                >조정</span>
+                              )}
+                            </td>
                             <td className="px-3 py-2.5 text-right font-mono text-white/60">
                               {p.gone
                                 ? <span className="text-amber-400/60 text-xs">거래없음</span>

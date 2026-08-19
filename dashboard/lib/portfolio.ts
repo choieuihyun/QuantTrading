@@ -73,6 +73,19 @@ export function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * 손으로 입력한 매수가는 그 뒤 액면분할·무상증자가 있어도 자동으로 조정되지 않는다.
+ * 현재가와 배율이 정수배에 가까우면 자본 조정을 의심한다 — 사용자가 넣은 값을
+ * 말없이 고쳐 쓰지는 않고 확인만 요청한다.
+ */
+export function suspectSplit(entry: number, now: number | null): number | null {
+  if (!now || entry <= 0) return null;
+  for (const k of [2, 3, 4, 5, 10, 0.5, 0.2, 0.1]) {
+    if (Math.abs(entry / now / k - 1) < 0.06) return k;
+  }
+  return null;
+}
+
 export interface Valued extends Position {
   /** 평가에 쓴 현재가. 시세에 없으면 null */
   nowPrice: number | null;
@@ -85,6 +98,8 @@ export interface Valued extends Position {
   value: number | null;
   heldDays: number;
   closed: boolean;
+  /** 자본 조정 의심 배율. null이면 정상 */
+  splitFactor: number | null;
 }
 
 export function valuePosition(p: Position, prices: Record<string, number>): Valued {
@@ -114,6 +129,7 @@ export function valuePosition(p: Position, prices: Record<string, number>): Valu
     pnlAmount,
     grossPct: mark === null || p.entryPrice <= 0 ? null : (mark - p.entryPrice) / p.entryPrice,
     heldDays,
+    splitFactor: closed ? null : suspectSplit(p.entryPrice, mark),
   };
 }
 

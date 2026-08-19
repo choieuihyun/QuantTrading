@@ -104,7 +104,9 @@ def main():
     # 추가 조회가 없다.
     print("\n실전 성적표 계산 중...")
     try:
-        scorecards = tracker.build(firebase_upload.get_db(), all_prices, list(configs))
+        scorecards = tracker.build(
+            firebase_upload.get_db(), all_prices, list(configs),
+            {m: (all_meta.get(m) or {}).get("closes") or {} for m in configs})
     except Exception as e:
         print(f"  성적표 실패: {e}")
         scorecards = {}
@@ -112,7 +114,9 @@ def main():
     # ── Firebase 업로드 (스크리닝 결과 먼저) ───────────────
     # 백테스트가 잡 타임아웃에 걸리면 프로세스가 통째로 죽는다. 오늘 볼 종목이
     # 매일 돌 필요 없는 백테스트에 인질로 잡히지 않도록 먼저 올린다.
-    firebase_upload.upload(all_market_results, run_type=run_type)
+    firebase_upload.upload(
+        all_market_results, run_type=run_type,
+        bar_dates={m: (all_meta.get(m) or {}).get("bar_date") for m in configs})
     firebase_upload.save_scorecard(scorecards)
     # 가상 매매 평가용 — 보유 종목이 패턴 목록에서 빠져도 현재가를 알 수 있어야 한다
     try:

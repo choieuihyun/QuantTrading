@@ -369,12 +369,23 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
         return None
 
 
+# 성적표가 "N일 전에 샀으면"을 계산할 때 쓸 종가 이력 길이.
+# 진입가를 저장해두고 나중 시세와 비교하면, 그 사이 액면분할·무상증자가 있었을 때
+# 조정 전 가격과 조정 후 가격을 비교하게 되어 -50%짜리 가짜 손실이 찍힌다.
+# 같은 시점에 받은 하나의 시계열에서 두 날짜를 모두 읽어야 한다.
+CLOSE_HISTORY_BARS = 90
+
+
 def _get_signals(ticker: str, start_date: str, market_return: float, cfg: dict = None,
-                 market_uptrend: bool = True) -> dict | None:
+                 market_uptrend: bool = True, closes: dict = None) -> dict | None:
     try:
         hist = fdr.DataReader(ticker, start_date)
         hist = sanitize_ohlc(drop_partial_bar(hist, cfg or {}))
-        return calc_signals_from_df(hist, market_return, cfg=cfg, market_uptrend=market_uptrend)
+        s = calc_signals_from_df(hist, market_return, cfg=cfg, market_uptrend=market_uptrend)
+        if s is not None and closes is not None:
+            tail = hist["Close"].iloc[-CLOSE_HISTORY_BARS:]
+            closes[str(ticker)] = {str(d.date()): float(v) for d, v in tail.items()}
+        return s
     except Exception:
         return None
 
@@ -783,9 +794,11 @@ def run(cfg: dict = None) -> dict:
     rows = get_universe(cfg)
 
     # 스코어링은 여기서 하지 않는다 — RS Rating이 유니버스 백분위라 전 종목을 모아야 구해진다.
+    closes: dict = {}          # {ticker: {날짜: 종가}} — 성적표가 같은 시계열에서 두 날짜를 읽도록
+
     def fetch(row):
         s = _get_signals(row["ticker"], start_date, market_return, cfg=cfg,
-                         market_uptrend=market_uptrend)
+                         market_uptrend=market_uptrend, closes=closes)
         return None if s is None else {**row, **s}
 
     results, failed = [], 0
@@ -871,5 +884,6 @@ def run(cfg: dict = None) -> dict:
     bar_date = all_df["bar_date"].mode()
     meta = {"bar_date": str(bar_date.iloc[0]) if len(bar_date) else None,
             # 종목 조회 화면이 상위 20위 밖 종목도 설명할 수 있으려면 전 종목 신호가 필요하다
-            "rows": all_df.to_dict("records")}
+            "rows": all_df.to_dict("records"),
+            "closes": closes}
     return output, prices, names, meta

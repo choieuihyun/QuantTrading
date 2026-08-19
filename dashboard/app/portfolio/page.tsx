@@ -425,7 +425,15 @@ function PositionTable({
               </td>
               <td className="px-3 py-2 tabular-nums text-white/60">{r.entryDate}</td>
               <td className="px-3 py-2 tabular-nums text-white/60">{r.heldDays}일</td>
-              <td className="px-3 py-2 tabular-nums">{money(r.entryPrice, unit)}</td>
+              <td className="px-3 py-2 tabular-nums">
+                {money(r.entryPrice, unit)}
+                {r.splitFactor && (
+                  <span
+                    title={`현재가의 약 ${r.splitFactor}배입니다. 액면분할·무상증자가 있었다면 매수가를 ${money(r.entryPrice / r.splitFactor, unit)}로 고쳐야 수익률이 맞습니다.`}
+                    className="ml-1 text-[10px] text-amber-300 align-super"
+                  >분할?</span>
+                )}
+              </td>
               <td className="px-3 py-2 tabular-nums">
                 {r.nowPrice === null
                   ? <span className="text-amber-300 text-xs">시세 없음</span>

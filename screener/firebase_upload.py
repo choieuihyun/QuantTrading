@@ -208,7 +208,8 @@ def attach_backtest(run_type: str, backtest: dict):
     print(f"Attached backtest → screener_results/{doc_id}")
 
 
-def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None):
+def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = None,
+           bar_dates: dict = None):
     """
     all_market_results: { "kr": {p1: df, ...}, "us": {...}, "crypto": {...} }
     backtest: { "kr": {common_trend: stats, ...}, "us": {...}, "crypto": {...} }
@@ -224,6 +225,12 @@ def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = No
         "market_date": market_date,
         "run_type":    run_type,
     }
+
+    # 시장별 실제 봉 날짜. market_date는 UTC 시계라 08:30 KST 실행에서 하루 어긋난다.
+    # 성적표가 이 날짜로 종가를 되짚으므로 라벨이 정확해야 한다.
+    for market_key, bd in (bar_dates or {}).items():
+        if bd:
+            data[f"{market_key}_bar_date"] = bd
 
     # 시장별 패턴 데이터 (kr_p1, us_common_trend, crypto_wyckoff 등)
     for market_key, results in all_market_results.items():

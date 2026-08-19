@@ -24,16 +24,26 @@ def _pct(entry: float, now: float) -> float | None:
     return round((now - entry) / entry, 4)
 
 
-def build(db, price_maps: dict, markets: list[str]) -> dict:
+# 진입가를 이 비율 넘게 벗어나면 액면분할·무상증자 등 자본 조정이 있었다고 본다
+ADJUST_TOL = 0.02
+
+
+def build(db, price_maps: dict, markets: list[str], close_maps: dict = None) -> dict:
     """
     price_maps: { "kr": {ticker: 현재가}, ... } — 이번 실행에서 받은 전 종목 시세
-    반환: { market: {"index": {...}, "docs": [{...}, ...]} }
+    close_maps: { "kr": {ticker: {날짜: 종가}} } — 같은 실행에서 받은 종가 이력
+
+    수익률은 저장된 진입가가 아니라 close_maps에서 다시 읽는다.
+    저장값을 쓰면 그 사이 액면분할·무상증자가 있었을 때 조정 전 가격과 조정 후 가격을
+    비교하게 된다. 실측: 티앤엘이 -47.8%로 찍혔는데 실제로는 +3.1%였고,
+    9,606건 중 244건(77종목)이 이 오차를 안고 있었다.
     """
     cutoff = (datetime.today() - timedelta(days=TRACK_DAYS)).strftime("%Y-%m-%d")
 
     # 과거 스크리닝 결과를 읽어온다 (문서 하나에 3개 시장이 함께 들어 있음).
     # backtest 블록이 문서 용량의 대부분이라 필요한 필드만 골라 받는다.
-    fields = ["market_date"] + [f"{m}_{k}" for m in markets for k in PATTERN_KEYS]
+    fields = (["market_date"] + [f"{m}_bar_date" for m in markets]
+              + [f"{m}_{k}" for m in markets for k in PATTERN_KEYS])
     snaps = (db.collection("screener_results")
                .where("market_date", ">=", cutoff)
                .order_by("market_date")
@@ -50,19 +60,23 @@ def build(db, price_maps: dict, markets: list[str]) -> dict:
         print("성적표: 과거 스크리닝 기록이 없습니다")
         return {}
 
-    # 같은 날 두 번(08:30/18:00) 실행되므로 날짜당 마지막 문서만 쓴다
-    by_date = {}
-    for doc_id, d in history:
-        by_date[d["market_date"]] = d
-    dates = sorted(by_date)[-KEEP_DOCS:]
-
-    print(f"성적표: 과거 기록 {len(history)}건 → 진입일 {len(dates)}일 사용")
+    print(f"성적표: 과거 기록 {len(history)}건")
 
     out = {}
     for market in markets:
         prices = price_maps.get(market) or {}
         if not prices:
             continue
+        closes = (close_maps or {}).get(market) or {}
+
+        # 진입일은 시계가 아니라 데이터의 봉 날짜로 잡는다. 08:30 KST 실행이 UTC로는
+        # 전날 23:30이라 market_date가 실제 시세 날짜와 어긋난다(월요일 아침은 이틀).
+        # 라벨이 틀리면 그 날짜로 종가를 찾는 아래 조회도 같이 틀어진다.
+        # bar_date는 이 수정 이후 실행부터 들어가므로 없으면 market_date로 되돌아간다.
+        by_date = {}
+        for _, d in history:
+            by_date[d.get(f"{market}_bar_date") or d["market_date"]] = d
+        dates = sorted(by_date)[-KEEP_DOCS:]
 
         docs = []
         for date in dates:
@@ -77,9 +91,15 @@ def build(db, price_maps: dict, markets: list[str]) -> dict:
                 picks, rets = [], []
                 for r in rows:
                     ticker = str(r.get("ticker", ""))
-                    entry  = r.get("price")
+                    stored = r.get("price")
                     now    = prices.get(ticker)
-                    ret    = _pct(entry, now) if now is not None else None
+                    # 오늘 받은 시계열에서 진입일 종가를 다시 읽는다 — 자본 조정 대응
+                    entry  = (closes.get(ticker) or {}).get(date)
+                    adjusted = bool(entry and stored
+                                    and abs(stored / entry - 1) > ADJUST_TOL)
+                    if entry is None:
+                        entry = stored          # 이력에 없으면 저장값으로 (정확도 낮음)
+                    ret = _pct(entry, now) if now is not None else None
                     # now가 없으면 상장폐지·거래정지로 오늘 유니버스에서 빠진 것 — 버리지 않고 표시
                     picks.append({
                         "ticker": ticker,
@@ -92,6 +112,9 @@ def build(db, price_maps: dict, markets: list[str]) -> dict:
                         "rsi":    r.get("rsi"),
                         "pos_52w": r.get("pos_52w"),
                         "gone":   now is None,
+                        # 자본 조정이 있었으면 score·rsi·pos_52w는 조정 전 기준이라 신뢰할 수 없다
+                        "adjusted":     adjusted,
+                        "stored_entry": stored if adjusted else None,
                     })
                     if ret is not None:
                         rets.append(ret)
@@ -101,6 +124,7 @@ def build(db, price_maps: dict, markets: list[str]) -> dict:
 
                 patterns[key] = {
                     "picks": picks,
+                    "adjusted": sum(1 for p in picks if p["adjusted"]),
                     "n":     len(rets),
                     "gone":  sum(1 for p in picks if p["gone"]),
                     "avg":   round(sum(rets) / len(rets), 4) if rets else None,

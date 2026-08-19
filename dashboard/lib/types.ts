@@ -200,12 +200,19 @@ export interface ScorePick {
   rsi?: number;
   pos_52w?: number;
   gone?: boolean;
+  /** 진입일 이후 액면분할·무상증자 등 자본 조정이 있었던 종목.
+   *  수익률은 조정 후 시계열로 다시 계산했지만 score·rsi·pos_52w는 조정 전 기준이다 */
+  adjusted?: boolean;
+  /** 그날 화면에 떴던 원래 가격 (조정 전) */
+  stored_entry?: number | null;
 }
 
 export interface ScorePattern {
   picks: ScorePick[];
   n: number;
   gone: number;
+  /** 자본 조정이 있었던 종목 수 */
+  adjusted?: number;
   avg?: number | null;
   median?: number | null;
   wins: number;
