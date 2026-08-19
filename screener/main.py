@@ -131,7 +131,10 @@ def main():
                 market_key, explain.build_shards(rows, cfg, thr), explain.labels(),
                 all_meta[market_key].get("bar_date"), thr)
         except Exception as e:
-            print(f"  [{market_key}] 종목 판정 업로드 실패: {e}")
+            # 조용히 넘어가면 화면에는 "데이터 없음"만 남아 원인을 못 찾는다
+            import traceback
+            print(f"  ⚠ [{market_key}] 종목 판정 업로드 실패: {type(e).__name__}: {e}")
+            traceback.print_exc()
 
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
     # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면

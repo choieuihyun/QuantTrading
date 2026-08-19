@@ -33,10 +33,6 @@ const STATE: Record<SignalState, { text: string; cls: string; Icon: React.Elemen
   x: { text: "대상 제외", cls: "text-white/35 border-white/10 bg-white/[0.03]",            Icon: MinusCircle },
 };
 
-function isCondList(v: SignalEntry[2]): v is [number, string][] {
-  return v.length > 0 && Array.isArray(v[0]);
-}
-
 export default function LookupPage() {
   const [market, setMarket] = useState<MarketKey>("kr");
   const [q, setQ] = useState("");
@@ -183,10 +179,10 @@ function PatternCard({
   pkey, entry, labels, threshold,
 }: { pkey: PatternKey; entry: SignalEntry; labels: string[]; threshold: number }) {
   const [open, setOpen] = useState(false);
-  const [state, score, detail] = entry;
+  const { s: state, v: score } = entry;
   const st = STATE[state];
-  const conds = isCondList(detail) ? detail : null;
-  const hits = !conds ? (detail as string[]) : null;
+  const conds = entry.c ?? null;
+  const hits = entry.h ?? null;
   const guide = PATTERN_GUIDE[pkey];
 
   return (
@@ -212,8 +208,8 @@ function PatternCard({
         <p className="px-4 pb-3 -mt-1 text-xs text-white/45">
           {conds
             ? (() => {
-                const i = conds.findIndex((c) => !c[0]);
-                return i < 0 ? "" : `${labels[i] ?? `조건 ${i + 1}`} — ${conds[i][1]}`;
+                const i = conds.findIndex((c) => !c.o);
+                return i < 0 ? "" : `${labels[i] ?? `조건 ${i + 1}`} — ${conds[i].d}`;
               })()
             : hits && hits.length
               ? `구성 패턴 ${hits.length}개 통과 (${hits.map((h) => LABEL[h] ?? h).join(", ")}) — 2개 필요`
@@ -225,7 +221,7 @@ function PatternCard({
         <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
           {conds && (
             <ul className="space-y-1.5">
-              {conds.map(([ok, val], i) => (
+              {conds.map(({ o: ok, d: val }, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   {ok ? (
                     <CircleCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />

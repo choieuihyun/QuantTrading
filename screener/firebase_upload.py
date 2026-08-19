@@ -157,6 +157,19 @@ def save_prices(price_maps: dict, names: dict = None, meta: dict = None):
         print(f"Uploaded → prices/{market} ({len(prices)}종목)")
 
 
+def _reject_nested_arrays(o, path=""):
+    """Firestore는 배열 요소로 배열을 허용하지 않는다. 위반하면 문서 전체가 거부되는데
+    호출부가 예외를 삼키면 화면에는 '데이터 없음'만 남아 원인을 못 찾는다."""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            _reject_nested_arrays(v, f"{path}.{k}")
+    elif isinstance(o, list):
+        for i, v in enumerate(o):
+            if isinstance(v, list):
+                raise ValueError(f"중첩 배열 {path}[{i}] — Firestore가 거부합니다")
+            _reject_nested_arrays(v, f"{path}[{i}]")
+
+
 def save_signals(market: str, shards: dict, labels: dict, bar_date: str, threshold: float):
     """
     종목별 패턴 판정 — "이 종목이 왜 목록에 없지?"에 답하는 데이터.
@@ -166,14 +179,16 @@ def save_signals(market: str, shards: dict, labels: dict, bar_date: str, thresho
     """
     if not shards:
         return
+    for i, rows in shards.items():
+        _reject_nested_arrays(rows, f"shard{i}")
     _init_app()
     db = firestore.client()
 
-    batch = db.batch()
+    # 샤드 하나가 150KB대라 한 배치로 묶으면 커밋 요청이 커진다. 개별로 쓴다.
     for i, rows in shards.items():
-        batch.set(db.collection("signals").document(f"{market}_{i}"),
-                  {"bar_date": bar_date, "tickers": rows})
-    batch.set(db.collection("signals").document(f"{market}_index"), {
+        db.collection("signals").document(f"{market}_{i}").set(
+            {"bar_date": bar_date, "tickers": rows})
+    db.collection("signals").document(f"{market}_index").set({
         "bar_date": bar_date,
         "run_at": datetime.now(timezone.utc),
         "threshold": threshold,
@@ -181,7 +196,6 @@ def save_signals(market: str, shards: dict, labels: dict, bar_date: str, thresho
         "labels": labels,
         "count": sum(len(r) for r in shards.values()),
     })
-    batch.commit()
     print(f"Uploaded → signals/{market}_* ({sum(len(r) for r in shards.values())}종목 / {len(shards)}샤드)")
 
 

@@ -233,13 +233,15 @@ def pack(s: dict, cfg: dict, threshold: float = None) -> dict:
     if excl:
         return {"x": excl}
     e = explain(s, cfg, threshold)
+    # Firestore는 배열 요소로 배열을 허용하지 않는다. 조건을 [[통과, 값], ...]로 담으면
+    # 문서 전체가 거부되고 화면에는 "데이터 없음"만 남는다. 맵의 배열로 담는다.
     p = {}
     for k in ALL_PATTERN_KEYS:
         v = e[k]
-        p[k] = [STATE_CODE[v["state"]], v["score"],
-                [[1 if c["ok"] else 0, c["detail"]] for c in v["conds"]]]
+        p[k] = {"s": STATE_CODE[v["state"]], "v": v["score"],
+                "c": [{"o": bool(c["ok"]), "d": c["detail"]} for c in v["conds"]]}
     for k in COMMON_SPECS:
-        p[k] = [STATE_CODE[e[k]["state"]], e[k]["score"], e[k]["hits"]]
+        p[k] = {"s": STATE_CODE[e[k]["state"]], "v": e[k]["score"], "h": list(e[k]["hits"])}
     return {"p": p}
 
 

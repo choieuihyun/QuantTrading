@@ -338,9 +338,19 @@ export interface SignalIndex {
   labels: Record<string, string[]>;
 }
 
-/** [상태, 점수, 조건배열] — 조건은 [통과여부, 실측값]. common_*는 조건 대신 적중 패턴 목록 */
 export type SignalState = "x" | "g" | "l" | "p";
-export type SignalEntry = [SignalState, number, [number, string][] | string[]];
+
+/** Firestore는 배열 안에 배열을 못 담아 조건을 맵의 배열로 둔다 (o=통과, d=실측값) */
+export interface SignalCond { o: boolean; d: string }
+
+export interface SignalEntry {
+  s: SignalState;
+  v: number;
+  /** 게이트 조건. 인덱스 문서의 labels[pattern]과 순서가 1:1 대응한다 */
+  c?: SignalCond[];
+  /** common_* 전용 — 통과한 구성 패턴 목록 */
+  h?: string[];
+}
 
 export interface SignalRow {
   /** 대상 제외 사유. 있으면 패턴 판정 자체를 안 한다 */
