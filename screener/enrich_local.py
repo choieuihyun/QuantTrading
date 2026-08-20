@@ -179,6 +179,13 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="업로드 없이 결과만 출력")
     a = ap.parse_args()
 
+    if not a.dry_run:
+        try:
+            import firebase_admin  # noqa: F401
+        except ImportError:
+            raise SystemExit("firebase-admin이 없습니다 — pip3 install firebase-admin\n"
+                             "  (수집만 해보려면 --dry-run)")
+
     load_env()
     from investor_flow import check_login
     ok, why = check_login()
@@ -202,7 +209,7 @@ def main():
     show = [c for c in ("foreign_net_20d_pct", "inst_net_20d_pct",
                         "short_bal_pct", "short_vol_pct", "per", "pbr") if c in all_df]
     # PER 0을 pd.NA로 치환해서 astype(float)가 죽는다. NA를 견디는 변환을 쓴다.
-    num = all_df[show].apply(pd.to_numeric, errors="coerce")
+    num = all_df[show].apply(pd.to_numeric, errors="coerce").astype("float64")
     print(num.describe().T[["count", "mean", "50%", "max"]].round(2).to_string())
 
     if "foreign_net_20d_pct" in num:
