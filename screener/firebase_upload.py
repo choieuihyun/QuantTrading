@@ -199,6 +199,28 @@ def save_signals(market: str, shards: dict, labels: dict, bar_date: str, thresho
     print(f"Uploaded → signals/{market}_* ({sum(len(r) for r in shards.values())}종목 / {len(shards)}샤드)")
 
 
+def save_flows(market: str, tickers: dict, bar_date: str):
+    """
+    KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 —
+    KRX가 데이터센터 IP를 막아 Actions에서는 받을 수 없다.
+
+    Actions가 하루 2번 덮어쓰는 prices/{market}과 분리해 둔다. 같은 문서에 넣으면
+    다음 자동 실행이 수급 데이터를 지운다.
+    """
+    if not tickers:
+        return
+    _reject_nested_arrays(tickers, "flows")
+    _init_app()
+    db = firestore.client()
+    db.collection("flows").document(market).set({
+        "bar_date": bar_date,
+        "run_at": datetime.now(timezone.utc),
+        "count": len(tickers),
+        "tickers": tickers,
+    })
+    print(f"Uploaded → flows/{market} ({len(tickers)}종목, 기준 {bar_date})")
+
+
 def attach_backtest(run_type: str, backtest: dict):
     """백테스트는 스크리닝 업로드 후에 끝나므로 같은 문서에 나중에 덧붙인다"""
     _init_app()
