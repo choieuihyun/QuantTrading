@@ -23,13 +23,37 @@ function tone(v: number | undefined) {
   return v > 0 ? "text-rose-400" : v < 0 ? "text-blue-400" : "text-white/50";
 }
 
+/**
+ * 값이 유니버스에서 어디쯤인지. 경계값은 오름차순이라 넘어선 개수가 곧 백분위다.
+ * "외국인 +1.2%"만으로는 큰 값인지 알 수 없다 — 공매도 잔고는 중앙값 0.17%에 최대 10.57%다.
+ */
+function rankOf(v: number | undefined, breaks?: number[]): number | null {
+  if (v === undefined || !Number.isFinite(v) || !breaks || breaks.length < 101) return null;
+  let i = 0;
+  while (i < 100 && breaks[i + 1] <= v) i += 1;
+  return i;
+}
+
+function RankTag({ p }: { p: number | null }) {
+  if (p === null) return null;
+  const top = 100 - p;
+  // 양 끝일수록 눈에 띄게 — 가운데는 정보가 거의 없다
+  const strong = top <= 10 || top >= 90;
+  return (
+    <span className={`text-[10px] ${strong ? "text-amber-300" : "text-white/30"}`}>
+      {top <= 50 ? `상위 ${Math.max(top, 1)}%` : `하위 ${101 - top}%`}
+    </span>
+  );
+}
+
 /** 순매수는 시총 대비 비율이라 종목 크기와 무관하게 비교된다 */
-function FlowCell({ label, v }: { label: string; v?: number }) {
+function FlowCell({ label, v, rank }: { label: string; v?: number; rank: number | null }) {
   const text = pct(v);
   return (
     <div>
       <div className="text-[11px] text-white/40">{label}</div>
       <div className={`text-sm font-mono tabular-nums ${tone(v)}`}>{text ?? "—"}</div>
+      <RankTag p={rank} />
     </div>
   );
 }
@@ -39,6 +63,8 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
   const disc = useSWR(["disc", market], () => fetchDisclosures(market));
 
   const row: FlowRow | undefined = flows.data?.tickers?.[ticker];
+  const dist = flows.data?.dist;
+  const r = (k: keyof FlowRow) => rankOf(row?.[k], dist?.[k as string]);
   const d = disc.data?.tickers?.[ticker];
   const critical = d?.items.filter((i) => i.lv === "c") ?? [];
 
@@ -87,10 +113,10 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
         ) : (
           <>
             <div className="grid grid-cols-4 gap-3">
-              <FlowCell label="외국인 20일" v={row.f20} />
-              <FlowCell label="기관 20일" v={row.i20} />
-              <FlowCell label="외국인 60일" v={row.f60} />
-              <FlowCell label="기관 60일" v={row.i60} />
+              <FlowCell label="외국인 20일" v={row.f20} rank={r("f20")} />
+              <FlowCell label="기관 20일" v={row.i20} rank={r("i20")} />
+              <FlowCell label="외국인 60일" v={row.f60} rank={r("f60")} />
+              <FlowCell label="기관 60일" v={row.i60} rank={r("i60")} />
             </div>
             <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-white/5">
               <div>
@@ -98,12 +124,14 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
                 <div className="text-sm font-mono tabular-nums text-white/80">
                   {row.sb !== undefined ? `${row.sb.toFixed(2)}%` : "—"}
                 </div>
+                <RankTag p={r("sb")} />
               </div>
               <div>
                 <div className="text-[11px] text-white/40">공매도 거래</div>
                 <div className="text-sm font-mono tabular-nums text-white/80">
                   {row.sv !== undefined ? `${row.sv.toFixed(2)}%` : "—"}
                 </div>
+                <RankTag p={r("sv")} />
               </div>
               <div>
                 <div className="text-[11px] text-white/40">PER / PBR</div>
@@ -121,6 +149,7 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
             <p className="mt-2 text-[11px] text-white/30">
               기준 {flows.data.bar_date} · 순매수는 기간 누적을 시가총액으로 나눈 값입니다.
               원화 절대액은 대형주가 항상 커서 종목 간 비교가 안 됩니다.
+              백분위는 이 시장 전 종목 중 위치입니다 — 사실 진술이며 예측이 아닙니다.
               <b className="text-white/45"> 점수에는 반영되지 않습니다</b> — 선정력이 아직 실측되지 않았습니다.
             </p>
           </>

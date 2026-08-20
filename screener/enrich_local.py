@@ -52,6 +52,10 @@ LEGEND = {
 }
 LOOKBACK_DAYS = 10        # 휴장·지연공시를 거슬러 올라가는 한도
 
+# 백분위를 종목마다 저장하면 문서가 두 배가 된다. 분포(0~100 분위 경계값)를 한 번만
+# 저장하고 화면에서 위치를 찾게 한다 — 6개 지표 × 101개 = 606개 숫자면 끝난다.
+DIST_KEYS = ["f20", "i20", "f60", "i60", "sv", "sb"]
+
 
 def load_env():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -216,9 +220,21 @@ def main():
         if rec:
             payload[str(tk)] = rec
 
+    # 유니버스 분포 — "외국인 +1.2%"가 큰 값인지 화면에서 판단할 수 있게 한다.
+    # 공매도 잔고는 중앙값 0.17%에 최대 10.57%라 절대값만으로는 감이 안 온다.
+    import numpy as np
+    dist = {}
+    for k in DIST_KEYS:
+        vals = [r[k] for r in payload.values() if k in r]
+        if len(vals) >= 100:
+            dist[k] = [round(float(x), 4) for x in np.percentile(vals, range(101))]
+
     import json
     size = len(json.dumps(payload).encode()) / 1024
-    print(f"\n문서 크기 {size:.0f} KB (Firestore 한도 1024)")
+    print(f"\n문서 크기 {size:.0f} KB (Firestore 한도 1024) · 분포 {len(dist)}개 지표")
+    for k in DIST_KEYS:
+        if k in dist:
+            print(f"   {k:4} 하위10% {dist[k][10]:8.2f} · 중앙 {dist[k][50]:8.2f} · 상위10% {dist[k][90]:8.2f}")
     if size > 900:
         raise SystemExit(f"문서가 너무 큽니다 ({size:.0f}KB) — 한도를 넘으면 쓰기가 통째로 거부됩니다")
 
@@ -227,7 +243,7 @@ def main():
         return
 
     import firebase_upload
-    firebase_upload.save_flows("kr", payload, LEGEND,
+    firebase_upload.save_flows("kr", payload, LEGEND, dist,
                                datetime.today().strftime("%Y-%m-%d"))
 
 

@@ -215,7 +215,7 @@ def save_signals(market: str, shards: dict, labels: dict, bar_date: str, thresho
     print(f"Uploaded → signals/{market}_* ({sum(len(r) for r in shards.values())}종목 / {len(shards)}샤드)")
 
 
-def save_flows(market: str, tickers: dict, legend: dict, bar_date: str):
+def save_flows(market: str, tickers: dict, legend: dict, dist: dict, bar_date: str):
     """
     KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 —
     KRX가 데이터센터 IP를 막아 Actions에서는 받을 수 없다.
@@ -233,6 +233,8 @@ def save_flows(market: str, tickers: dict, legend: dict, bar_date: str):
         "run_at": datetime.now(timezone.utc),
         "count": len(tickers),
         "legend": legend,          # 저장 키가 짧아 뜻을 문서 안에 같이 둔다
+        # 0~100 분위 경계값. 종목마다 백분위를 저장하는 대신 분포만 한 번 담는다.
+        "dist": dist,
         "tickers": tickers,
     })
     print(f"Uploaded → flows/{market} ({len(tickers)}종목, 기준 {bar_date})")

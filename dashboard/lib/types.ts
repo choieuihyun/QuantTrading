@@ -381,6 +381,8 @@ export interface FlowDoc {
   count: number;
   /** 짧은 키의 뜻 — 문서에 함께 저장된다 */
   legend: Record<string, string>;
+  /** 지표별 0~100 분위 경계값(101개). 종목마다 백분위를 저장하지 않고 여기서 찾는다 */
+  dist?: Record<string, number[]>;
   tickers: Record<string, FlowRow>;
 }
 
