@@ -20,3 +20,7 @@ docs_cache/
 
 # 재현 백테스트 캐시 (OHLCV + 신호 패널)
 screener/.cache/
+
+# Firebase 서비스 계정 키 — 절대 커밋 금지
+serviceAccount*.json
+*-firebase-adminsdk-*.json

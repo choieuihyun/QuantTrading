@@ -6,8 +6,16 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 
+# 로컬 실행용 서비스 계정 키. private key는 여러 줄이라 .env에 손으로 붙여넣으면
+# 줄바꿈이 깨지기 쉽다 — Firebase 콘솔에서 받은 JSON을 그대로 두는 편이 안전하다.
+# .gitignore에 등록돼 있다.
+_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "serviceAccount.json")
+
+
 def _init_app():
-    if not firebase_admin._apps:
+    if firebase_admin._apps:
+        return
+    if os.environ.get("FIREBASE_PROJECT_ID"):       # Actions 경로
         cred = credentials.Certificate({
             "type": "service_account",
             "project_id": os.environ["FIREBASE_PROJECT_ID"],
@@ -15,7 +23,15 @@ def _init_app():
             "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
             "token_uri": "https://oauth2.googleapis.com/token",
         })
-        firebase_admin.initialize_app(cred)
+    elif os.path.exists(_KEY_FILE):                 # 로컬 경로
+        cred = credentials.Certificate(_KEY_FILE)
+        print(f"Firebase 인증: {os.path.basename(_KEY_FILE)}")
+    else:
+        raise SystemExit(
+            "Firebase 자격증명이 없습니다.\n"
+            "  Firebase 콘솔 → 프로젝트 설정 → 서비스 계정 → '새 비공개 키 생성'\n"
+            f"  받은 JSON을 {_KEY_FILE} 로 저장하세요 (gitignore 처리됨)")
+    firebase_admin.initialize_app(cred)
 
 
 def _to_native(val):

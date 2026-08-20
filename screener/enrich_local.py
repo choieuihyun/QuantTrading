@@ -10,7 +10,8 @@ KRX가 데이터센터 IP를 Akamai 엣지에서 막아 GitHub Actions에서는 
   python enrich_local.py              # KOSPI+KOSDAQ 수집 후 Firestore 업로드
   python enrich_local.py --dry-run    # 업로드 없이 결과만 확인
 
-Firestore 자격증명(FIREBASE_*)과 KRX_ID/KRX_PW를 screener/.env 에서 읽는다.
+KRX_ID/KRX_PW는 screener/.env 에서 읽는다.
+Firebase는 screener/serviceAccount.json (콘솔에서 받은 키 파일)을 쓴다.
 """
 
 import argparse
