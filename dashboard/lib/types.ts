@@ -294,6 +294,11 @@ export interface ScreenerResult {
   run_at: { seconds: number };
   market_date: string;
   run_type: string;
+  /** 150일선 위 종목 비율. 지수보다 장세를 정확히 말해준다 */
+  kr_breadth?: number | null;
+  us_breadth?: number | null;
+  crypto_breadth?: number | null;
+  kr_bar_date?: string;
   p1: Stock[];
   p2: Stock[];
   p3: Stock[];

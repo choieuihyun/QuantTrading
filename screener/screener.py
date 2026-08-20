@@ -840,6 +840,13 @@ def run(cfg: dict = None) -> dict:
         all_df[f"score_{key}"] = [score_pattern(key, r, cfg) for r in rows_d]
     print(f"RS Rating 산출: 모집단 {len(all_df)}종목 | 70↑ {int((all_df['rs_rating'] >= 70).sum())}종목")
 
+    # 시장 폭 — 지수보다 장세를 정확히 말해준다.
+    # market_uptrend(지수가 200일선 위)는 63스캔 중 85%가 참이라 게이트로 못 쓴다.
+    # 실제로 종목의 74%가 150일선 아래인 날에도 '상승'으로 나왔다.
+    above = all_df["price"] > all_df["ma150"]
+    breadth = round(float(above.mean()), 4) if len(all_df) else None
+    print(f"시장 폭: 150일선 위 {int(above.sum())}/{len(all_df)}종목 ({breadth*100:.0f}%)")
+
     output = {}
     for key in ALL_PATTERN_KEYS:
         col = f"score_{key}"
@@ -883,6 +890,8 @@ def run(cfg: dict = None) -> dict:
     # 종목마다 상장·거래정지로 마지막 봉이 다를 수 있어 최빈값을 시장 기준일로 쓴다
     bar_date = all_df["bar_date"].mode()
     meta = {"bar_date": str(bar_date.iloc[0]) if len(bar_date) else None,
+            "breadth": breadth,
+            "market_uptrend": bool(all_df["market_uptrend"].iloc[0]) if len(all_df) else None,
             # 종목 조회 화면이 상위 20위 밖 종목도 설명할 수 있으려면 전 종목 신호가 필요하다
             "rows": all_df.to_dict("records"),
             "closes": closes}

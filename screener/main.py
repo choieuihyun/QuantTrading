@@ -130,7 +130,7 @@ def main():
     # 매일 돌 필요 없는 백테스트에 인질로 잡히지 않도록 먼저 올린다.
     firebase_upload.upload(
         all_market_results, run_type=run_type,
-        bar_dates={m: (all_meta.get(m) or {}).get("bar_date") for m in configs})
+        bar_dates={m: (all_meta.get(m) or {}) for m in configs})
     firebase_upload.save_scorecard(scorecards)
     # 가상 매매 평가용 — 보유 종목이 패턴 목록에서 빠져도 현재가를 알 수 있어야 한다
     try:

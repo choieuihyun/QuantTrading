@@ -19,7 +19,7 @@ const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
 
 // 패턴을 성격별 3그룹으로 묶어 위계를 만든다 — 11개를 한 줄에 늘어놓으면 무엇부터 볼지 알 수 없다
 const GROUPS = [
-  { key: "common", label: "★ 공통 신호", hint: "여러 기법이 동시에 가리킴 · 신뢰도 최상" },
+  { key: "common", label: "★ 공통 신호", hint: "여러 기법이 동시에 가리킴 · 겹침 이득은 실측 안 됨" },
   { key: "legend", label: "전설 기법",   hint: "검증된 트레이더 방법론" },
   { key: "custom", label: "내 패턴",     hint: "한국 시장 특화 자체 개발" },
 ] as const;
@@ -38,6 +38,46 @@ const PATTERNS: { key: PatternKey; group: GroupKey; label: string; desc: string;
   { key: "p2",      group: "custom", label: "5일선 추세",       desc: "5일선 지지 + 정배열 완성 + 거래량 터짐",              icon: Activity,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
   { key: "p3",      group: "custom", label: "눌림목",           desc: "피보나치 되돌림 구간 + MACD 반등",                    icon: BarChart2, color: "text-amber-400",   bg: "bg-amber-500/10" },
 ];
+
+/**
+ * 시장 폭 — 150일선 위 종목 비율. 지수보다 장세를 정확히 말해준다.
+ * 원전 기법은 하락장에서 스스로 0종목이 되지만 자체 패턴(p1~p3)은 조건이 느슨해
+ * 장이 무너져도 30종목씩 낸다. 그게 "살 게 30개 있다"는 뜻이 아님을 여기서 밝힌다.
+ */
+function BreadthBar({ data, market }: { data: Record<string, unknown>; market: MarketKey }) {
+  const b = data[`${market}_breadth`] as number | null | undefined;
+  if (b === null || b === undefined || !Number.isFinite(b)) return null;
+  const p = b * 100;
+  const weak = p < 50;
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${weak
+      ? "border-amber-500/30 bg-amber-500/5" : "border-white/10 bg-white/[0.02]"}`}>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-white/45">시장 폭 — 150일선 위 종목</span>
+          <span className={`text-xl font-bold font-mono ${weak ? "text-amber-300" : "text-emerald-400"}`}>
+            {p.toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-1.5 flex-1 min-w-40 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className={`h-full ${weak ? "bg-amber-400" : "bg-emerald-400"}`}
+            style={{ width: `${Math.min(p, 100)}%` }}
+          />
+        </div>
+      </div>
+      {weak && (
+        <p className="mt-2 text-[11px] text-amber-200/70">
+          종목 절반 이상이 150일선 아래입니다. 원전 기법은 이런 장에서 스스로 0종목이 되지만
+          내 패턴(정배열매집·5일선추세·눌림목)은 조건이 느슨해 계속 신호를 냅니다 —
+          <b> 목록이 길다고 살 만한 종목이 많은 게 아닙니다.</b>
+          {" "}실측: 폭 50% 미만 9일에서 정배열매집은 9일 전부, 5일선추세는 7/9일 유니버스보다 나빴습니다
+          (눌림목은 차이 없음).
+        </p>
+      )}
+    </div>
+  );
+}
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -112,6 +152,8 @@ export default function Home() {
             {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 bg-white/5 rounded-xl" />)}
           </div>
         ) : data ? (
+          <>
+          <BreadthBar data={data} market={market} />
           <div className="grid grid-cols-5 gap-3">
             <StatCard label="★ 추세 공통" value={getPatternData("common_trend").length} color="text-yellow-400" />
             <StatCard label="★ 매집 공통" value={getPatternData("common_accum").length} color="text-rose-300" />
@@ -119,6 +161,7 @@ export default function Home() {
             <StatCard label="VCP"         value={getPatternData("vcp").length}           color="text-purple-400" />
             <StatCard label="Stage 2"     value={getPatternData("stage2").length}        color="text-cyan-400" />
           </div>
+          </>
         ) : null}
 
         <Tabs defaultValue="common_trend">

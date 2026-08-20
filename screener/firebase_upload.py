@@ -306,9 +306,13 @@ def upload(all_market_results: dict, run_type: str = "auto", backtest: dict = No
 
     # 시장별 실제 봉 날짜. market_date는 UTC 시계라 08:30 KST 실행에서 하루 어긋난다.
     # 성적표가 이 날짜로 종가를 되짚으므로 라벨이 정확해야 한다.
-    for market_key, bd in (bar_dates or {}).items():
-        if bd:
-            data[f"{market_key}_bar_date"] = bd
+    for market_key, md in (bar_dates or {}).items():
+        if not md:
+            continue
+        data[f"{market_key}_bar_date"] = md.get("bar_date")
+        # 시장 폭 — 자체 패턴은 장이 무너져도 계속 신호를 내므로 화면에서 함께 보여야 한다
+        data[f"{market_key}_breadth"] = md.get("breadth")
+        data[f"{market_key}_market_uptrend"] = md.get("market_uptrend")
 
     # 시장별 패턴 데이터 (kr_p1, us_common_trend, crypto_wyckoff 등)
     for market_key, results in all_market_results.items():
