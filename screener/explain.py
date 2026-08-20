@@ -124,6 +124,36 @@ COMMON_SPECS = {
     "common_all":   CUSTOM_PATTERN_KEYS,
 }
 
+# 원전이 정한 진입 기준점과 손절. (기준점 필드, 손절 필드, 기준일 필드, 라벨)
+# 점수는 "구조가 맞는가", 기준점은 "지금이 그 자리인가" — 다른 질문이라 따로 싣는다.
+# 여기 기준점을 바꾸면 화면의 ENTRY_STATS(패턴별 근접도 실측)가 다른 것을 재게 된다.
+ENTRY_REF = {
+    "vcp":     ("vcp_pivot",  "vcp_stop",  "vcp_pivot_date", "마지막 수축 고점"),
+    "darvas":  ("box_top",    "stop_box",  None,             "박스 천장"),
+    "stage2":  ("range_high", "range_low", None,             "베이스 저항"),
+    "wyckoff": ("range_high", "range_low", None,             "거래범위 상단"),
+}
+
+
+def entry_info(key: str, s: dict) -> dict | None:
+    """기준점 대비 현재 위치. 게이트 탈락 종목도 실어야 '언제 사야 했나'를 볼 수 있다."""
+    ref = ENTRY_REF.get(key)
+    if not ref:
+        return None
+    pivot_f, stop_f, date_f, label = ref
+    pivot, price = _num(s.get(pivot_f)), _num(s.get("price"))
+    if pivot <= 0 or price <= 0:
+        return None
+    out = {"lb": label, "pv": pivot, "gap": round(price / pivot - 1, 4)}
+    day = s.get(date_f) if date_f else None
+    if day:
+        out["pd"] = str(day)[5:]
+    stop = _num(s.get(stop_f))
+    if stop > 0:
+        out["st"] = stop
+        out["sg"] = round(stop / price - 1, 4)
+    return out
+
 
 def base_exclusion(s: dict, cfg: dict) -> str | None:
     """대상 제외 사유. 통과면 None."""
@@ -207,7 +237,27 @@ def verify(market: str = "kr") -> int:
                           f"설명={mine} 실제={real}")
     print(f"\n검사 {len(rows):,}행 × {len(ALL_PATTERN_KEYS)}패턴 — "
           f"{'불일치 ' + str(bad) + '건' if bad else '전부 일치 ✓'}")
+
+    # 게이트 판정이 맞아도 업로드가 터지면 화면에는 옛날 데이터가 남는다.
+    # entry_info 미정의로 pack()이 통째로 죽은 채 커밋된 적이 있다 — main.py가 예외를 삼킨다.
+    bad += _verify_pack(rows[-3000:], cfg)
     return bad
+
+
+def _verify_pack(rows: list, cfg: dict) -> int:
+    seen = {k: 0 for k in ENTRY_REF}
+    for s in rows:
+        packed = pack(s, cfg)                       # 예외가 나면 그대로 터뜨린다
+        for k, v in (packed.get("p") or {}).items():
+            if k in seen and "e" in v:
+                seen[k] += 1
+    n = len(rows)
+    print(f"pack() {n:,}행 통과 — 기준점 적재율 "
+          + " / ".join(f"{k} {c * 100 // max(n, 1)}%" for k, c in seen.items()))
+    missing = [k for k, c in seen.items() if c == 0]
+    if missing:
+        print(f"  ✗ 기준점이 한 건도 없는 패턴: {', '.join(missing)}")
+    return len(missing)
 
 
 
@@ -232,19 +282,19 @@ def pack(s: dict, cfg: dict, threshold: float = None) -> dict:
     excl = base_exclusion(s, cfg)
     if excl:
         return {"x": excl}
-    e = explain(s, cfg, threshold)
+    ex = explain(s, cfg, threshold)
     # Firestore는 배열 요소로 배열을 허용하지 않는다. 조건을 [[통과, 값], ...]로 담으면
     # 문서 전체가 거부되고 화면에는 "데이터 없음"만 남는다. 맵의 배열로 담는다.
     p = {}
     for k in ALL_PATTERN_KEYS:
-        v = e[k]
+        v = ex[k]
         p[k] = {"s": STATE_CODE[v["state"]], "v": v["score"],
                 "c": [{"o": bool(c["ok"]), "d": c["detail"]} for c in v["conds"]]}
-        e = entry_info(k, s)
-        if e:
-            p[k]["e"] = e
+        ent = entry_info(k, s)
+        if ent:
+            p[k]["e"] = ent
     for k in COMMON_SPECS:
-        p[k] = {"s": STATE_CODE[e[k]["state"]], "v": e[k]["score"], "h": list(e[k]["hits"])}
+        p[k] = {"s": STATE_CODE[ex[k]["state"]], "v": ex[k]["score"], "h": list(ex[k]["hits"])}
     return {"p": p}
 
 
