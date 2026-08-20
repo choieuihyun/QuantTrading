@@ -24,6 +24,31 @@ MARKETS = {"KOSPI": "kr", "KOSDAQ": "kr"}
 WINDOWS = {"20d": 20, "60d": 60}
 INVESTORS = {"foreign": "외국인", "inst": "기관합계"}
 SHORT_SAMPLE_DAYS = 5     # 공매도 거래비중은 하루치가 튀어 며칠 평균을 쓴다
+
+# (원본 컬럼, 저장 키, 소수 자리). 저장 키가 짧은 이유는 키 이름이 종목 수만큼 반복돼
+# 문서 용량의 절반 이상을 먹기 때문이다 — 실측 978KB 중 609KB가 키 이름이었다.
+# 뜻은 flows 문서의 legend에 함께 저장한다.
+FIELD_MAP = [
+    ("foreign_net_20d_pct", "f20", 2),
+    ("inst_net_20d_pct",    "i20", 2),
+    ("foreign_net_60d_pct", "f60", 2),
+    ("inst_net_60d_pct",    "i60", 2),
+    ("short_vol_pct",       "sv",  2),
+    ("short_bal_pct",       "sb",  2),
+    ("per",                 "per", 1),
+    ("pbr",                 "pbr", 2),
+    ("div_yield",           "div", 2),
+    ("eps",                 "eps", 0),
+]
+LEGEND = {
+    "f20": "외국인 20일 순매수 / 시가총액 (%)",
+    "i20": "기관 20일 순매수 / 시가총액 (%)",
+    "f60": "외국인 60일 순매수 / 시가총액 (%)",
+    "i60": "기관 60일 순매수 / 시가총액 (%)",
+    "sv":  "공매도 거래비중 5일 평균 (%)",
+    "sb":  "공매도 잔고비중 — 상장주식수 대비 (%)",
+    "per": "PER (KRX 공식)", "pbr": "PBR", "div": "배당수익률 (%)", "eps": "EPS",
+}
 LOOKBACK_DAYS = 10        # 휴장·지연공시를 거슬러 올라가는 한도
 
 
@@ -171,26 +196,35 @@ def main():
 
     show = [c for c in ("foreign_net_20d_pct", "inst_net_20d_pct",
                         "short_bal_pct", "short_vol_pct", "per", "pbr") if c in all_df]
-    print(all_df[show].describe().T[["count", "mean", "50%", "max"]].round(2).to_string())
+    print(all_df[show].astype(float).describe().T[["count", "mean", "50%", "max"]].round(2).to_string())
 
     print("\n외국인 20일 순매수 상위 (시총 대비)")
     if "foreign_net_20d_pct" in all_df:
         print(all_df.nlargest(5, "foreign_net_20d_pct")[show].round(2).to_string())
 
-    payload = {
-        t: {k: (None if pd.isna(v) else round(float(v), 4))
-            for k, v in row.items() if k != "marcap"}
-        for t, row in all_df.iterrows()
-    }
+    payload = {}
+    for tk, row in all_df.iterrows():
+        rec = {}
+        for src, dst, nd in FIELD_MAP:
+            v = row.get(src)
+            if v is None or pd.isna(v):
+                continue                      # 없는 값은 키 자체를 생략
+            rec[dst] = int(v) if nd == 0 else round(float(v), nd)
+        if rec:
+            payload[str(tk)] = rec
+
     import json
-    print(f"\n문서 크기 {len(json.dumps(payload).encode())/1024:.0f} KB (Firestore 한도 1024)")
+    size = len(json.dumps(payload).encode()) / 1024
+    print(f"\n문서 크기 {size:.0f} KB (Firestore 한도 1024)")
+    if size > 900:
+        raise SystemExit(f"문서가 너무 큽니다 ({size:.0f}KB) — 한도를 넘으면 쓰기가 통째로 거부됩니다")
 
     if a.dry_run:
         print("--dry-run — 업로드하지 않았습니다")
         return
 
     import firebase_upload
-    firebase_upload.save_flows("kr", payload,
+    firebase_upload.save_flows("kr", payload, LEGEND,
                                datetime.today().strftime("%Y-%m-%d"))
 
 
