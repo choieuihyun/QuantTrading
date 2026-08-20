@@ -383,7 +383,8 @@ export interface FlowDoc {
   legend: Record<string, string>;
   /** 지표별 0~100 분위 경계값(101개). 종목마다 백분위를 저장하지 않고 여기서 찾는다 */
   dist?: Record<string, number[]>;
-  tickers: Record<string, FlowRow>;
+  /** 종목별 데이터를 JSON 문자열로 담는다 — 맵으로 두면 색인 항목이 문서 한도(4만)를 넘는다 */
+  tickers_json: string;
 }
 
 /** disclosures/{market} — DART 공시. lv: c=자본조정(무상증자·분할) / m=중요공시 */
@@ -392,5 +393,6 @@ export interface DisclosureRow { items: DisclosureItem[]; dropped: number; from:
 export interface DisclosureDoc {
   bar_date: string;
   count: number;
-  tickers: Record<string, DisclosureRow>;
+  /** 위와 같은 이유로 JSON 문자열 */
+  tickers_json: string;
 }

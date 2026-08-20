@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
   ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
-  SignalIndex, SignalShard, FlowDoc, DisclosureDoc,
+  SignalIndex, SignalShard, FlowDoc, FlowRow, DisclosureDoc, DisclosureRow,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -103,14 +103,35 @@ export async function fetchSignalShard(
   return snap.exists() ? (snap.data() as SignalShard) : null;
 }
 
+/**
+ * 종목별 데이터는 JSON 문자열 한 덩어리로 저장돼 있다 — 맵으로 두면 Firestore가
+ * 필드마다 색인을 만들어 문서당 4만 개 한도를 넘긴다. 여기서 한 번만 파싱한다.
+ */
+function unpack<T>(raw: string | undefined): Record<string, T> {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, T>;
+  } catch {
+    return {};
+  }
+}
+
 /** KRX 수급·공매도. 로컬 보강 실행에서만 채워지므로 없을 수 있다. */
-export async function fetchFlows(market: MarketKey): Promise<FlowDoc | null> {
+export async function fetchFlows(
+  market: MarketKey
+): Promise<(FlowDoc & { tickers: Record<string, FlowRow> }) | null> {
   const snap = await getDoc(doc(db, "flows", market));
-  return snap.exists() ? (snap.data() as FlowDoc) : null;
+  if (!snap.exists()) return null;
+  const d = snap.data() as FlowDoc;
+  return { ...d, tickers: unpack<FlowRow>(d.tickers_json) };
 }
 
 /** DART 공시. 패턴 목록에 오른 종목만 수집된다. */
-export async function fetchDisclosures(market: MarketKey): Promise<DisclosureDoc | null> {
+export async function fetchDisclosures(
+  market: MarketKey
+): Promise<(DisclosureDoc & { tickers: Record<string, DisclosureRow> }) | null> {
   const snap = await getDoc(doc(db, "disclosures", market));
-  return snap.exists() ? (snap.data() as DisclosureDoc) : null;
+  if (!snap.exists()) return null;
+  const d = snap.data() as DisclosureDoc;
+  return { ...d, tickers: unpack<DisclosureRow>(d.tickers_json) };
 }

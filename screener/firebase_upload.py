@@ -1,3 +1,4 @@
+import json
 import math
 import os
 from datetime import datetime, timezone
@@ -173,6 +174,23 @@ def save_prices(price_maps: dict, names: dict = None, meta: dict = None):
         print(f"Uploaded → prices/{market} ({len(prices)}종목)")
 
 
+# Firestore 문서 한도는 용량(1MB)만이 아니다. 모든 필드가 자동 색인되고
+# 색인 항목이 문서당 40,000개를 넘으면 쓰기가 거부된다
+# (실측: 2,786종목 × 10필드 × 2 ≈ 55,700개 → INDEX_ENTRIES_COUNT_LIMIT_EXCEEDED).
+# 종목별 데이터를 JSON 문자열 한 덩어리로 저장하면 색인 항목이 1개가 된다.
+# 어차피 화면은 문서를 통째로 받아 종목 하나를 꺼내 쓰므로 손해가 없다.
+MAX_FIELD_BYTES = 1_000_000
+
+
+def _packed(obj: dict, label: str) -> str:
+    s = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+    n = len(s.encode())
+    if n > MAX_FIELD_BYTES:
+        raise ValueError(f"{label} 직렬화 {n/1024:.0f}KB — 문자열 필드 한도(약 1MB) 초과")
+    print(f"  {label}: {len(obj)}종목 → {n/1024:.0f}KB (색인 항목 1개)")
+    return s
+
+
 def _reject_nested_arrays(o, path=""):
     """Firestore는 배열 요소로 배열을 허용하지 않는다. 위반하면 문서 전체가 거부되는데
     호출부가 예외를 삼키면 화면에는 '데이터 없음'만 남아 원인을 못 찾는다."""
@@ -225,7 +243,6 @@ def save_flows(market: str, tickers: dict, legend: dict, dist: dict, bar_date: s
     """
     if not tickers:
         return
-    _reject_nested_arrays(tickers, "flows")
     _init_app()
     db = firestore.client()
     db.collection("flows").document(market).set({
@@ -235,7 +252,7 @@ def save_flows(market: str, tickers: dict, legend: dict, dist: dict, bar_date: s
         "legend": legend,          # 저장 키가 짧아 뜻을 문서 안에 같이 둔다
         # 0~100 분위 경계값. 종목마다 백분위를 저장하는 대신 분포만 한 번 담는다.
         "dist": dist,
-        "tickers": tickers,
+        "tickers_json": _packed(tickers, "flows"),
     })
     print(f"Uploaded → flows/{market} ({len(tickers)}종목, 기준 {bar_date})")
 
@@ -249,14 +266,13 @@ def save_disclosures(market: str, tickers: dict, bar_date: str):
     """
     if not tickers:
         return
-    _reject_nested_arrays(tickers, "disclosures")
     _init_app()
     db = firestore.client()
     db.collection("disclosures").document(market).set({
         "bar_date": bar_date,
         "run_at": datetime.now(timezone.utc),
         "count": len(tickers),
-        "tickers": tickers,
+        "tickers_json": _packed(tickers, "disclosures"),
     })
     print(f"Uploaded → disclosures/{market} ({len(tickers)}종목)")
 
