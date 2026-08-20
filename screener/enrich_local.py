@@ -34,6 +34,10 @@ FIELD_MAP = [
     ("inst_net_20d_pct",    "i20", 2),
     ("foreign_net_60d_pct", "f60", 2),
     ("inst_net_60d_pct",    "i60", 2),
+    ("foreign_net_20d_eok", "f20v", 0),
+    ("inst_net_20d_eok",    "i20v", 0),
+    ("foreign_net_60d_eok", "f60v", 0),
+    ("inst_net_60d_eok",    "i60v", 0),
     ("short_vol_pct",       "sv",  2),
     ("short_bal_pct",       "sb",  2),
     ("per",                 "per", 1),
@@ -46,6 +50,10 @@ LEGEND = {
     "i20": "기관 20일 순매수 / 시가총액 (%)",
     "f60": "외국인 60일 순매수 / 시가총액 (%)",
     "i60": "기관 60일 순매수 / 시가총액 (%)",
+    "f20v": "외국인 20일 순매수 (억원)",
+    "i20v": "기관 20일 순매수 (억원)",
+    "f60v": "외국인 60일 순매수 (억원)",
+    "i60v": "기관 60일 순매수 (억원)",
     "sv":  "공매도 거래비중 5일 평균 (%)",
     "sb":  "공매도 잔고비중 — 상장주식수 대비 (%)",
     "per": "PER (KRX 공식)", "pbr": "PBR", "div": "배당수익률 (%)", "eps": "EPS",
@@ -54,7 +62,8 @@ LOOKBACK_DAYS = 10        # 휴장·지연공시를 거슬러 올라가는 한�
 
 # 백분위를 종목마다 저장하면 문서가 두 배가 된다. 분포(0~100 분위 경계값)를 한 번만
 # 저장하고 화면에서 위치를 찾게 한다 — 6개 지표 × 101개 = 606개 숫자면 끝난다.
-DIST_KEYS = ["f20", "i20", "f60", "i60", "sv", "sb"]
+DIST_KEYS = ["f20", "i20", "f60", "i60",
+             "f20v", "i20v", "f60v", "i60v", "sv", "sb"]
 
 
 def load_env():
@@ -166,11 +175,14 @@ def collect(market: str) -> pd.DataFrame:
     df = pd.DataFrame(out)
     df.index.name = "ticker"
 
-    # 원화 절대액은 대형주가 항상 이긴다. 시총 대비 비율이라야 종목 간 비교가 된다.
+    # 두 가지를 다 싣는다. 비율은 종목 간 비교가 되고, 절대액은 "얼마나 들어왔나"에 답한다.
+    # HMM 실측: 외국인 60일 +1,567억으로 절대 32위(상위 1%)인데 시총 20조로 나누면 614위(22%).
+    # 비율만 보여주면 대형주에 자금이 몰려도 화면에서는 평범해 보인다.
     if "marcap" in df.columns:
         cap = df["marcap"].where(df["marcap"] > 0)
         for c in [c for c in df.columns if c.endswith(("_20d", "_60d"))]:
             df[f"{c}_pct"] = (df[c] / cap * 100).round(4)
+            df[f"{c}_eok"] = (df[c] / 1e8).round(0)
     return df
 
 

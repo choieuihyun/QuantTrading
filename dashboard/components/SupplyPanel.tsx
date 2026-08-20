@@ -46,14 +46,30 @@ function RankTag({ p }: { p: number | null }) {
   );
 }
 
-/** 순매수는 시총 대비 비율이라 종목 크기와 무관하게 비교된다 */
-function FlowCell({ label, v, rank }: { label: string; v?: number; rank: number | null }) {
-  const text = pct(v);
+/**
+ * 비율과 절대액을 함께 띄운다. 둘은 다른 질문이고 대형주에서 정반대로 갈린다 —
+ * HMM 실측: 외국인 60일 +1,567억으로 절대 32위(상위 1%)인데 시총 20조로 나누면 614위(22%).
+ * 비율만 보여주면 자금이 몰린 대형주가 화면에서 평범해 보인다.
+ */
+function FlowCell({
+  label, v, rank, won, wonRank,
+}: {
+  label: string; v?: number; rank: number | null;
+  won?: number; wonRank: number | null;
+}) {
   return (
     <div>
       <div className="text-[11px] text-white/40">{label}</div>
-      <div className={`text-sm font-mono tabular-nums ${tone(v)}`}>{text ?? "—"}</div>
+      <div className={`text-sm font-mono tabular-nums ${tone(v)}`}>{pct(v) ?? "—"}</div>
       <RankTag p={rank} />
+      {won !== undefined && Number.isFinite(won) && (
+        <div className="mt-1 pt-1 border-t border-white/5">
+          <div className={`text-xs font-mono tabular-nums ${tone(won)}`}>
+            {won > 0 ? "+" : ""}{Math.round(won).toLocaleString()}억
+          </div>
+          <RankTag p={wonRank} />
+        </div>
+      )}
     </div>
   );
 }
@@ -113,10 +129,10 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
         ) : (
           <>
             <div className="grid grid-cols-4 gap-3">
-              <FlowCell label="외국인 20일" v={row.f20} rank={r("f20")} />
-              <FlowCell label="기관 20일" v={row.i20} rank={r("i20")} />
-              <FlowCell label="외국인 60일" v={row.f60} rank={r("f60")} />
-              <FlowCell label="기관 60일" v={row.i60} rank={r("i60")} />
+              <FlowCell label="외국인 20일" v={row.f20} rank={r("f20")} won={row.f20v} wonRank={r("f20v")} />
+              <FlowCell label="기관 20일"   v={row.i20} rank={r("i20")} won={row.i20v} wonRank={r("i20v")} />
+              <FlowCell label="외국인 60일" v={row.f60} rank={r("f60")} won={row.f60v} wonRank={r("f60v")} />
+              <FlowCell label="기관 60일"   v={row.i60} rank={r("i60")} won={row.i60v} wonRank={r("i60v")} />
             </div>
             <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-white/5">
               <div>
@@ -147,8 +163,9 @@ export function SupplyPanel({ ticker, market = "kr" }: { ticker: string; market?
               </div>
             </div>
             <p className="mt-2 text-[11px] text-white/30">
-              기준 {flows.data.bar_date} · 순매수는 기간 누적을 시가총액으로 나눈 값입니다.
-              원화 절대액은 대형주가 항상 커서 종목 간 비교가 안 됩니다.
+              기준 {flows.data.bar_date} · 위는 <b className="text-white/45">시총 대비 비율</b>,
+              아래는 <b className="text-white/45">절대 순매수액</b>입니다. 두 순위는 대형주에서 크게 갈립니다 —
+              시총이 크면 같은 금액이 들어와도 비율이 작아집니다. 어느 쪽이 유효한지는 실측되지 않았으니 둘 다 봅니다.
               백분위는 이 시장 전 종목 중 위치입니다 — 사실 진술이며 예측이 아닙니다.
               <b className="text-white/45"> 점수에는 반영되지 않습니다</b> — 선정력이 아직 실측되지 않았습니다.
             </p>

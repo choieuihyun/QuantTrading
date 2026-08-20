@@ -386,7 +386,10 @@ export interface SignalShard {
 
 /** flows/{market} — KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 */
 export interface FlowRow {
+  /** 시총 대비 (%) */
   f20?: number; i20?: number; f60?: number; i60?: number;
+  /** 절대 순매수 (억원). 비율만 보면 대형주가 구조적으로 낮게 나온다 */
+  f20v?: number; i20v?: number; f60v?: number; i60v?: number;
   sv?: number; sb?: number;
   per?: number; pbr?: number; div?: number; eps?: number;
 }
