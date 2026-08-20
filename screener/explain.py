@@ -245,19 +245,27 @@ def verify(market: str = "kr") -> int:
 
 
 def _verify_pack(rows: list, cfg: dict) -> int:
-    seen = {k: 0 for k in ENTRY_REF}
+    """게이트 통과 건에는 기준점과 손절이 반드시 실려야 한다.
+    'e'만 세면 손절 필드가 None이 돼도 통과한다 — 화면에서 손절 줄만 조용히 사라진다."""
+    seen = {k: [0, 0, 0] for k in ENTRY_REF}        # 통과, 기준점, 손절
     for s in rows:
-        packed = pack(s, cfg)                       # 예외가 나면 그대로 터뜨린다
-        for k, v in (packed.get("p") or {}).items():
-            if k in seen and "e" in v:
-                seen[k] += 1
-    n = len(rows)
-    print(f"pack() {n:,}행 통과 — 기준점 적재율 "
-          + " / ".join(f"{k} {c * 100 // max(n, 1)}%" for k, c in seen.items()))
-    missing = [k for k, c in seen.items() if c == 0]
-    if missing:
-        print(f"  ✗ 기준점이 한 건도 없는 패턴: {', '.join(missing)}")
-    return len(missing)
+        for k, v in (pack(s, cfg).get("p") or {}).items():   # 예외는 그대로 터뜨린다
+            if k in seen and v["s"] == "p":
+                seen[k][0] += 1
+                seen[k][1] += "e" in v
+                seen[k][2] += "st" in v.get("e", {})
+
+    # 패널은 라이브보다 오래된 스키마다. 컬럼이 아예 없는 것과 값이 비는 것은 다른 문제다.
+    cols = set(rows[0]) if rows else set()
+    print(f"pack() {len(rows):,}행 통과 — 게이트 통과 건의 기준점/손절 적재")
+    bad = 0
+    for k, (n, e, st) in seen.items():
+        stale = ENTRY_REF[k][1] not in cols
+        ok = n and e == n and (st == n or stale)
+        print(f"  {'✓' if ok else '—' if not n else '✗'} {k:8} 통과 {n:5,} · "
+              f"기준점 {e:5,} · 손절 {'패널 미보유' if stale else f'{st:5,}'}")
+        bad += bool(n) and not ok
+    return bad
 
 
 

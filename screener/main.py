@@ -50,6 +50,7 @@ def main():
     only = sys.argv[2] if len(sys.argv) > 2 else None
     configs = {only: ALL_CONFIGS[only]} if only in ALL_CONFIGS else ALL_CONFIGS
     print(f"Running screener [{run_type}] — 시장: {', '.join(configs)}")
+    upload_failures = []
 
     all_market_results = {}
     all_prices = {}
@@ -149,10 +150,12 @@ def main():
                 market_key, explain.build_shards(rows, cfg, thr), explain.labels(),
                 all_meta[market_key].get("bar_date"), thr)
         except Exception as e:
-            # 조용히 넘어가면 화면에는 "데이터 없음"만 남아 원인을 못 찾는다
+            # 삼키기만 하면 화면에 옛날 데이터가 그대로 남는다. 실제로 이 자리에서
+            # pack()이 죽은 채 며칠간 signals가 갱신되지 않은 적이 있다.
             import traceback
             print(f"  ⚠ [{market_key}] 종목 판정 업로드 실패: {type(e).__name__}: {e}")
             traceback.print_exc()
+            upload_failures.append(f"signals/{market_key}: {type(e).__name__}: {e}")
 
     # ── 백테스트 (3개 시장 각각) ───────────────────────────
     # 스크리너 결과와 무관한 유니버스 표본을 스캔 — 선정된 종목만 되짚으면
@@ -169,6 +172,13 @@ def main():
 
     if any(all_backtest.values()):
         firebase_upload.attach_backtest(run_type, all_backtest)
+
+    # 나머지 업로드를 다 끝낸 뒤에 실패한다 — 여기서 바로 죽으면 백테스트까지 잃는다
+    if upload_failures:
+        print("\n실패한 업로드:")
+        for f in upload_failures:
+            print(f"  ✗ {f}")
+        raise SystemExit(1)
     print("\nDone.")
 
 
