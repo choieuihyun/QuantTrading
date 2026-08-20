@@ -8,10 +8,11 @@ DART 재무 수집 + 파생지표 계산.
 - 회사마다 계정명이 다르므로 account_id(IFRS 코드)로 매칭. sj_div로 재무제표 종류 선구분.
 """
 import os
+import time
 import pandas as pd
 import OpenDartReader as ODR
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # reprt_code → 분기번호 (11013=1Q, 11012=반기=2Q, 11014=3Q, 11011=사업보고서=Q4/연간)
 REPRT_Q = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}
@@ -354,3 +355,86 @@ def add_valuation(df: pd.DataFrame) -> pd.DataFrame:
     df["psr"] = df.apply(lambda r: _v(r, "ttm_revenue"), axis=1)
     df = df.drop(columns=[c for c in _RAW_DROP if c in df.columns])
     return df
+
+
+# ══════════════════════════════════════════════════════
+# 공시 — 종목 상세 화면용
+# ══════════════════════════════════════════════════════
+
+DISCLOSURE_DAYS = 180
+
+# 자본 조정. 주가가 기계적으로 바뀌므로 과거 가격과 오늘 가격을 그냥 비교하면 안 된다.
+# 티앤엘이 2026-08-05 무상증자 권리락으로 반토막 났고, 성적표가 그걸 -47%로 표시했다.
+CRITICAL_PAT = "분할|무상증자|권리락|주식병합|감자"
+
+# 투자 판단에 직접 영향을 주는 공시. 나머지(임원 소유상황 등)는 종목당 수백 건이라 버린다.
+MATERIAL_PAT = ("유상증자|전환사채|신주인수권|교환사채|"
+                "잠정실적|영업실적|공급계약|수주|자기주식|최대주주|"
+                "상장폐지|관리종목|거래정지|감사보고서|횡령|배임")
+
+
+def fetch_disclosures(tickers: list[str], days: int = DISCLOSURE_DAYS) -> dict:
+    """
+    {ticker: {"items": [{d, nm, lv, no}], "dropped": n, "from": 날짜}}
+      lv: "c" 자본조정 / "m" 중요공시
+
+    DART는 KRX와 무관한 서버라 GitHub Actions에서도 접속된다.
+    """
+    if not os.environ.get("DART_API_KEY") or not tickers:
+        return {}
+
+    import re
+    dart = _client()
+    start = (datetime.today() - timedelta(days=days)).strftime("%Y-%m-%d")
+    end = datetime.today().strftime("%Y-%m-%d")
+
+    def _one(ticker: str) -> tuple[str, dict]:
+        # 조용히 빈 결과를 돌려주면 "공시 없는 종목"과 "조회 실패"가 구분되지 않는다.
+        # DART가 동시 호출에서 간헐적으로 실패해 한 번 재시도한다.
+        df, err = None, None
+        for attempt in range(2):
+            try:
+                df = dart.list(ticker, start=start, end=end)
+                err = None
+                break
+            except Exception as e:
+                err = e
+                time.sleep(0.4 * (attempt + 1))
+        if err is not None:
+            print(f"    공시 조회 실패 {ticker}: {type(err).__name__} {str(err)[:60]}")
+            return ticker, {}
+        if df is None or not hasattr(df, "empty") or df.empty or "report_nm" not in df.columns:
+            return ticker, {}
+
+        nm = df["report_nm"].astype(str)
+        crit = nm.str.contains(CRITICAL_PAT, na=False, regex=True)
+        mat = nm.str.contains(MATERIAL_PAT, na=False, regex=True)
+        keep = df[crit | mat].copy()
+        keep["lv"] = ["c" if c else "m" for c in crit[crit | mat]]
+
+        items = []
+        seen = set()
+        for r in keep.sort_values("rcept_dt", ascending=False).itertuples():
+            # [기재정정]이 같은 건에 여러 번 붙는다 — 같은 날 같은 제목은 최신 하나만
+            base = re.sub(r"^\[[^\]]+\]", "", str(r.report_nm)).strip()
+            key = (str(r.rcept_dt), base)
+            if key in seen:
+                continue
+            seen.add(key)
+            d = str(r.rcept_dt)
+            items.append({
+                "d": f"{d[:4]}-{d[4:6]}-{d[6:]}" if len(d) == 8 else d,
+                "nm": base[:80],
+                "lv": r.lv,
+                "no": str(r.rcept_no),
+            })
+        return ticker, {"items": items[:30], "dropped": int(len(df) - len(keep)), "from": start}
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for ticker, payload in ex.map(_one, tickers):
+            if payload:
+                out[ticker] = payload
+    crit_n = sum(1 for p in out.values() for i in p["items"] if i["lv"] == "c")
+    print(f"공시 수집: {len(out)}종목 · 자본조정 공시 {crit_n}건")
+    return out

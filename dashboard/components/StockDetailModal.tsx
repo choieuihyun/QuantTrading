@@ -5,6 +5,7 @@ import type { Stock } from "@/lib/types";
 import { MetricBadge } from "./MetricBadge";
 import { InventoryCycleChart } from "./InventoryCycleChart";
 import { PeerCompare } from "./PeerCompare";
+import { SupplyPanel } from "./SupplyPanel";
 import { isNum } from "@/lib/utils";
 
 interface Props {
@@ -134,6 +135,12 @@ export function StockDetailModal({ stock, onClose, universe = [] }: Props) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {(stock.market === "KOSPI" || stock.market === "KOSDAQ") && (
+          <div className="mt-2 pt-3 border-t border-white/10">
+            <SupplyPanel ticker={stock.ticker} market="kr" />
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { DataError } from "@/components/DataError";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchPrices, fetchSignalIndex, fetchSignalShard, shardOf } from "@/lib/fetcher";
 import { PATTERN_GUIDE } from "@/lib/patternGuide";
+import { SupplyPanel } from "@/components/SupplyPanel";
 import type { MarketKey, PatternKey, SignalEntry, SignalState } from "@/lib/types";
 
 const MARKETS: { key: MarketKey; label: string; flag: string }[] = [
@@ -152,6 +153,12 @@ export default function LookupPage() {
                 <p className="text-xs text-white/30 mt-3">
                   모든 패턴 이전에 걸리는 조건이라 패턴별 판정 자체를 하지 않습니다.
                 </p>
+              </div>
+            )}
+
+            {ticker && !shard.isLoading && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <SupplyPanel ticker={ticker} market={market} />
               </div>
             )}
 

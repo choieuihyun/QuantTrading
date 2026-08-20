@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
   ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
-  SignalIndex, SignalShard,
+  SignalIndex, SignalShard, FlowDoc, DisclosureDoc,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -101,4 +101,16 @@ export async function fetchSignalShard(
 ): Promise<SignalShard | null> {
   const snap = await getDoc(doc(db, "signals", `${market}_${shard}`));
   return snap.exists() ? (snap.data() as SignalShard) : null;
+}
+
+/** KRX 수급·공매도. 로컬 보강 실행에서만 채워지므로 없을 수 있다. */
+export async function fetchFlows(market: MarketKey): Promise<FlowDoc | null> {
+  const snap = await getDoc(doc(db, "flows", market));
+  return snap.exists() ? (snap.data() as FlowDoc) : null;
+}
+
+/** DART 공시. 패턴 목록에 오른 종목만 수집된다. */
+export async function fetchDisclosures(market: MarketKey): Promise<DisclosureDoc | null> {
+  const snap = await getDoc(doc(db, "disclosures", market));
+  return snap.exists() ? (snap.data() as DisclosureDoc) : null;
 }

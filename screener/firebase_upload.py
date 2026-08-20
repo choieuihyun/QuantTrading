@@ -222,6 +222,27 @@ def save_flows(market: str, tickers: dict, legend: dict, bar_date: str):
     print(f"Uploaded → flows/{market} ({len(tickers)}종목, 기준 {bar_date})")
 
 
+def save_disclosures(market: str, tickers: dict, bar_date: str):
+    """
+    종목별 공시 — 상세 화면에서 읽는다. 패턴 목록에 오른 종목만 수집한다.
+
+    DART는 KRX와 무관한 서버라 Actions에서도 접속된다. 자본 조정 공시(무상증자·분할)는
+    보유 수익률 계산을 통째로 틀어지게 하므로 화면에서 눈에 띄게 표시해야 한다.
+    """
+    if not tickers:
+        return
+    _reject_nested_arrays(tickers, "disclosures")
+    _init_app()
+    db = firestore.client()
+    db.collection("disclosures").document(market).set({
+        "bar_date": bar_date,
+        "run_at": datetime.now(timezone.utc),
+        "count": len(tickers),
+        "tickers": tickers,
+    })
+    print(f"Uploaded → disclosures/{market} ({len(tickers)}종목)")
+
+
 def attach_backtest(run_type: str, backtest: dict):
     """백테스트는 스크리닝 업로드 후에 끝나므로 같은 문서에 나중에 덧붙인다"""
     _init_app()

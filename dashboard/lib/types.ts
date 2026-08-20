@@ -369,3 +369,26 @@ export interface SignalShard {
   bar_date: string;
   tickers: Record<string, SignalRow>;
 }
+
+/** flows/{market} — KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 */
+export interface FlowRow {
+  f20?: number; i20?: number; f60?: number; i60?: number;
+  sv?: number; sb?: number;
+  per?: number; pbr?: number; div?: number; eps?: number;
+}
+export interface FlowDoc {
+  bar_date: string;
+  count: number;
+  /** 짧은 키의 뜻 — 문서에 함께 저장된다 */
+  legend: Record<string, string>;
+  tickers: Record<string, FlowRow>;
+}
+
+/** disclosures/{market} — DART 공시. lv: c=자본조정(무상증자·분할) / m=중요공시 */
+export interface DisclosureItem { d: string; nm: string; lv: "c" | "m"; no: string }
+export interface DisclosureRow { items: DisclosureItem[]; dropped: number; from: string }
+export interface DisclosureDoc {
+  bar_date: string;
+  count: number;
+  tickers: Record<string, DisclosureRow>;
+}

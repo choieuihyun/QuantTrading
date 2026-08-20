@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 import screener
 import firebase_upload
 import dart_fetcher
@@ -77,6 +78,19 @@ def main():
                         results[key] = _apply_canslim_c(key, dart_fetcher.add_valuation(merged))
                 # 분기 재무 히스토리는 별도 컬렉션으로 저장 (재고 사이클/차트용)
                 firebase_upload.save_fundamentals(histories)
+
+                # 공시 — 무상증자·분할 같은 자본 조정은 수익률 계산을 통째로 틀어지게 한다.
+                # DART는 KRX와 다른 서버라 Actions에서도 받을 수 있다.
+                try:
+                    disc = dart_fetcher.fetch_disclosures(list(all_tickers))
+                    firebase_upload.save_disclosures(
+                        market_key, disc,
+                        (all_meta.get(market_key) or {}).get("bar_date")
+                        or datetime.today().strftime("%Y-%m-%d"))
+                except Exception as e:
+                    import traceback
+                    print(f"  ⚠ 공시 수집 실패: {type(e).__name__}: {e}")
+                    traceback.print_exc()
 
         # 외인·기관 수급 (KR 전용) — 가격에서 파생되지 않은 유일한 독립 축
         if market_key == "kr" and investor_flow.available():
