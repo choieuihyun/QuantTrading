@@ -2,8 +2,10 @@ name: Quant Screener
 
 on:
   schedule:
-    - cron: "30 23 * * 0-4"  # 08:30 KST Mon-Fri (장 시작 전 / 미장 마감 후)
-    - cron: "0 9 * * 1-5"    # 18:00 KST Mon-Fri (KRX 일봉 확정 후)
+    # KST = UTC+9. 아래 세 시각 모두 KST 기준 09시 이후라 UTC 요일이 같다.
+    - cron: "30 23 * * 0-4"  # 08:30 KST 월~금 — 장 시작 전, 전날 완성봉 기준
+    - cron: "40 6 * * 1-5"   # 15:40 KST 월~금 — 정규장 마감 직후
+    - cron: "0 11 * * 1-5"   # 20:00 KST 월~금 — 데이터 확정 + 저녁 DART 공시
   workflow_dispatch:           # 수동 실행
 
 jobs:
