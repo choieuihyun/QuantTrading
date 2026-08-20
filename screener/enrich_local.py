@@ -197,11 +197,13 @@ def main():
 
     show = [c for c in ("foreign_net_20d_pct", "inst_net_20d_pct",
                         "short_bal_pct", "short_vol_pct", "per", "pbr") if c in all_df]
-    print(all_df[show].astype(float).describe().T[["count", "mean", "50%", "max"]].round(2).to_string())
+    # PER 0을 pd.NA로 치환해서 astype(float)가 죽는다. NA를 견디는 변환을 쓴다.
+    num = all_df[show].apply(pd.to_numeric, errors="coerce")
+    print(num.describe().T[["count", "mean", "50%", "max"]].round(2).to_string())
 
-    print("\n외국인 20일 순매수 상위 (시총 대비)")
-    if "foreign_net_20d_pct" in all_df:
-        print(all_df.nlargest(5, "foreign_net_20d_pct")[show].round(2).to_string())
+    if "foreign_net_20d_pct" in num:
+        print("\n외국인 20일 순매수 상위 (시총 대비)")
+        print(num.nlargest(5, "foreign_net_20d_pct").round(2).to_string())
 
     payload = {}
     for tk, row in all_df.iterrows():
