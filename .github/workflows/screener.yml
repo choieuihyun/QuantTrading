@@ -34,5 +34,7 @@ jobs:
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
+          # KRX_ID/KRX_PW는 일부러 넘기지 않는다. KRX가 데이터센터 IP를 막아
+          # 여기서는 한 번도 성공한 적이 없고, 하루 3번 실패하는 자동 로그인만 남는다.
+          # KRX는 자동화 접속을 약관으로 금지하고 IP를 차단한다 (실측: 2026-08-20).
+          # 수급은 로컬에서 enrich_local.py로 채운다.
