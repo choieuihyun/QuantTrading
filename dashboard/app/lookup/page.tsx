@@ -27,6 +27,22 @@ const LABEL: Record<string, string> = {
   darvas: "Darvas", p1: "정배열매집", p2: "5일선추세", p3: "눌림목",
 };
 
+/**
+ * 기준점 대비 위치가 실제로 성과와 관계있는지 — 패턴마다 정반대다.
+ * 2026-08-20 실측(63스캔, 보유 20일 초과수익). t가 모두 1.3 미만이라 확정은 아니다.
+ * 일괄 "진입점 근접 필터"를 만들면 안 되는 이유가 여기 있다.
+ */
+const ENTRY_STATS: Partial<Record<PatternKey, string>> = {
+  vcp: "실측(20일 초과수익): 기준점 아래 −1.62% / 0~5% +1.57% / 5~20% +0.46% / 20%↑ −0.23%. "
+     + "원전 매수구간이 가장 나았지만 t 0.88로 확정은 아닙니다. 통과 건의 절반은 이미 +20%를 넘긴 뒤였습니다.",
+  darvas: "실측: 0~5% −1.19% / 5~20% +0.59% / 20%↑ −1.90%. "
+        + "원전 매수구간이 오히려 나빴습니다 — 근접도로 판단할 근거가 없습니다.",
+  stage2: "실측: 기준점 아래 +1.06% / 0~5% +0.22% / 5~20% +1.28% / 20%↑ +5.55%. "
+        + "연장될수록 나았습니다 — 추세추종 성격이라 '늦었다'가 불리하지 않았습니다.",
+  wyckoff: "실측: 기준점 아래 −0.46% / 0~5% −0.03% / 5~20% +0.01% / 20%↑ +2.39%. "
+         + "매집 패턴이라 71%가 돌파 전에 잡힙니다. 연장 구간이 오히려 나았습니다.",
+};
+
 const STATE: Record<SignalState, { text: string; cls: string; Icon: React.ElementType }> = {
   p: { text: "통과",      cls: "text-emerald-400 border-emerald-400/30 bg-emerald-500/10", Icon: CircleCheck },
   l: { text: "점수 미달", cls: "text-amber-300 border-amber-400/30 bg-amber-500/10",       Icon: AlertCircle },
@@ -248,12 +264,9 @@ function PatternCard({
                 </span>
               )}
             </div>
-            {e.gap > 0.05 && (
+            {ENTRY_STATS[pkey] && (
               <p className="mt-1.5 text-[11px] text-white/35">
-                진입점을 지난 자리입니다. 실측: VCP 통과 935건 중 피벗 5% 이내는 19%뿐이고
-                중앙값은 +21.7%였습니다. 보유 20일 초과수익은 5% 이내 +0.99% / 5~20% +0.46% /
-                20% 초과 −0.23%로 <b className="text-white/50">방향은 원전 말대로였지만 t가 모두 1 미만</b>이라
-                불리하다고 단정할 수는 없습니다.
+                {ENTRY_STATS[pkey]}
               </p>
             )}
           </div>
