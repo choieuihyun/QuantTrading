@@ -240,6 +240,9 @@ def pack(s: dict, cfg: dict, threshold: float = None) -> dict:
         v = e[k]
         p[k] = {"s": STATE_CODE[v["state"]], "v": v["score"],
                 "c": [{"o": bool(c["ok"]), "d": c["detail"]} for c in v["conds"]]}
+        e = entry_info(k, s)
+        if e:
+            p[k]["e"] = e
     for k in COMMON_SPECS:
         p[k] = {"s": STATE_CODE[e[k]["state"]], "v": e[k]["score"], "h": list(e[k]["hits"])}
     return {"p": p}

@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
   ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
-  SignalIndex, SignalShard, FlowDoc, FlowRow, DisclosureDoc, DisclosureRow,
+  SignalIndex, SignalShard, SignalRow, FlowDoc, FlowRow, DisclosureDoc, DisclosureRow,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -98,9 +98,11 @@ export async function fetchSignalIndex(market: MarketKey): Promise<SignalIndex |
 export async function fetchSignalShard(
   market: MarketKey,
   shard: number
-): Promise<SignalShard | null> {
+): Promise<(SignalShard & { tickers: Record<string, SignalRow> }) | null> {
   const snap = await getDoc(doc(db, "signals", `${market}_${shard}`));
-  return snap.exists() ? (snap.data() as SignalShard) : null;
+  if (!snap.exists()) return null;
+  const d = snap.data() as SignalShard;
+  return { ...d, tickers: unpack<SignalRow>(d.tickers_json) };
 }
 
 /**

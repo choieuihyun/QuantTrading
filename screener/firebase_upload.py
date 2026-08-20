@@ -213,15 +213,13 @@ def save_signals(market: str, shards: dict, labels: dict, bar_date: str, thresho
     """
     if not shards:
         return
-    for i, rows in shards.items():
-        _reject_nested_arrays(rows, f"shard{i}")
     _init_app()
     db = firestore.client()
 
     # 샤드 하나가 150KB대라 한 배치로 묶으면 커밋 요청이 커진다. 개별로 쓴다.
     for i, rows in shards.items():
         db.collection("signals").document(f"{market}_{i}").set(
-            {"bar_date": bar_date, "tickers": rows})
+            {"bar_date": bar_date, "tickers_json": _packed(rows, f"signals[{i}]")})
     db.collection("signals").document(f"{market}_index").set({
         "bar_date": bar_date,
         "run_at": datetime.now(timezone.utc),

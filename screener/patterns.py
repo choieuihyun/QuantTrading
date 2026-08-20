@@ -109,6 +109,11 @@ def vcp_state(high, low, close, volume, window: int = VCP_WINDOW) -> dict:
     pivot = float(high[legs[-1]["high_i"]])
     out["vcp_pivot"] = pivot
     out["vcp_above_pivot"] = bool(float(close[-1]) > pivot)
+    # 피벗은 새 수축이 확정되면 재설정된다(실측: 슈프리마가 46,800 → 49,550으로 옮겨감).
+    # 값만 보여주면 언제 기준이 바뀌었는지 알 수 없어 위치도 함께 넘긴다.
+    out["vcp_pivot_i"] = int(legs[-1]["high_i"])
+    # Minervini의 손절은 마지막 수축 저점 — 피벗과 깊이에서 유도된다
+    out["vcp_stop"] = round(pivot * (1 - depths[-1]), 2)
     return out
 
 

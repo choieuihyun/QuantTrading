@@ -355,9 +355,15 @@ export type SignalState = "x" | "g" | "l" | "p";
 /** Firestore는 배열 안에 배열을 못 담아 조건을 맵의 배열로 둔다 (o=통과, d=실측값) */
 export interface SignalCond { o: boolean; d: string }
 
+/** 원전이 정한 진입 기준점. pv=피벗 gap=현재가와의 거리 st=원전 손절 sg=손절까지 거리 */
+export interface EntryRef {
+  pv: number; lb: string; gap: number; pd?: string; st?: number; sg?: number;
+}
+
 export interface SignalEntry {
   s: SignalState;
   v: number;
+  e?: EntryRef;
   /** 게이트 조건. 인덱스 문서의 labels[pattern]과 순서가 1:1 대응한다 */
   c?: SignalCond[];
   /** common_* 전용 — 통과한 구성 패턴 목록 */
@@ -372,7 +378,8 @@ export interface SignalRow {
 
 export interface SignalShard {
   bar_date: string;
-  tickers: Record<string, SignalRow>;
+  /** 색인 항목 한도(문서당 4만) 때문에 JSON 문자열로 담는다 */
+  tickers_json: string;
 }
 
 /** flows/{market} — KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 */

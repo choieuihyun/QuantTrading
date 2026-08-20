@@ -190,6 +190,7 @@ function PatternCard({
   const st = STATE[state];
   const conds = entry.c ?? null;
   const hits = entry.h ?? null;
+  const e = entry.e;
   const guide = PATTERN_GUIDE[pkey];
 
   return (
@@ -222,6 +223,41 @@ function PatternCard({
               ? `구성 패턴 ${hits.length}개 통과 (${hits.map((h) => LABEL[h] ?? h).join(", ")}) — 2개 필요`
               : "구성 패턴 통과 없음 — 2개 필요"}
         </p>
+      )}
+
+      {/* 점수는 "패턴 구조가 맞는가", 진입점은 "지금 사는 자리인가" — 다른 질문이다 */}
+      {e && (
+        <div className="px-4 pb-3 -mt-1">
+          <div className="rounded-lg bg-white/[0.03] border border-white/5 px-3 py-2 text-xs">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <span className="text-white/45">
+                원전 진입점 <span className="text-white/70">{e.lb}</span>{" "}
+                <b className="font-mono text-white/85">{e.pv.toLocaleString()}</b>
+                {e.pd && <span className="text-white/30"> ({e.pd})</span>}
+              </span>
+              <span className={e.gap > 0.05 ? "text-amber-300" : e.gap < 0 ? "text-white/50" : "text-emerald-400"}>
+                현재가 {e.gap >= 0 ? "+" : ""}{(e.gap * 100).toFixed(1)}%
+                {e.gap < 0 ? " (돌파 전)" : ""}
+              </span>
+              {e.st !== undefined && e.sg !== undefined && (
+                <span className="text-white/45">
+                  원전 손절 <b className="font-mono text-white/70">{e.st.toLocaleString()}</b>
+                  <span className={e.sg < -0.08 ? " text-amber-300" : " text-white/50"}>
+                    {" "}({(e.sg * 100).toFixed(1)}%)
+                  </span>
+                </span>
+              )}
+            </div>
+            {e.gap > 0.05 && (
+              <p className="mt-1.5 text-[11px] text-white/35">
+                진입점을 지난 자리입니다. 실측: VCP 통과 935건 중 피벗 5% 이내는 19%뿐이고
+                중앙값은 +21.7%였습니다. 보유 20일 초과수익은 5% 이내 +0.99% / 5~20% +0.46% /
+                20% 초과 −0.23%로 <b className="text-white/50">방향은 원전 말대로였지만 t가 모두 1 미만</b>이라
+                불리하다고 단정할 수는 없습니다.
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       {open && (

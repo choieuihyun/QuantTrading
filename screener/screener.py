@@ -285,6 +285,8 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             # 시계가 아니라 데이터의 마지막 봉 날짜. UTC 러너에서 08:30 KST 실행 시
             # datetime.today()가 실제 시세 날짜와 최대 이틀까지 어긋난다(월요일 아침).
             "bar_date":           str(hist.index[-1].date()),
+            "vcp_pivot_date":     (str(hist.index[vcp["vcp_pivot_i"]].date())
+                                   if vcp.get("vcp_pivot_i") is not None else None),
             "price":              price_now,
             "ma5":                round(ma5_v, nd),
             "ma20":               round(ma20_v, nd),
@@ -351,6 +353,9 @@ def calc_signals_from_df(hist: pd.DataFrame, market_return: float = 0.0, cfg: di
             "vcp_vol_declining":  bool(vcp["vcp_vol_declining"]),
             "vcp_last_depth":     vcp["vcp_last_depth"],
             "vcp_pivot":          None if vcp["vcp_pivot"] is None else round(vcp["vcp_pivot"], nd),
+            # Minervini의 손절 = 마지막 수축 저점. 원전 진입점(피벗)에서 얼마나 벌어졌는지
+            # 화면이 보여줘야 "패턴은 맞는데 진입은 늦었다"를 구분할 수 있다.
+            "vcp_stop":           None if vcp.get("vcp_stop") is None else round(vcp["vcp_stop"], nd),
             "vcp_above_pivot":    bool(vcp["vcp_above_pivot"]),
             # Weinstein 베이스 / Wyckoff 거래범위
             "range_high":         None if range_high is None else round(range_high, nd),
