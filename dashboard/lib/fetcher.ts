@@ -102,19 +102,24 @@ export async function fetchSignalShard(
   const snap = await getDoc(doc(db, "signals", `${market}_${shard}`));
   if (!snap.exists()) return null;
   const d = snap.data() as SignalShard;
-  return { ...d, tickers: unpack<SignalRow>(d.tickers_json) };
+  return { ...d, tickers: unpack<SignalRow>(d.tickers_json, d.tickers) };
 }
 
 /**
  * 종목별 데이터는 JSON 문자열 한 덩어리로 저장돼 있다 — 맵으로 두면 Firestore가
  * 필드마다 색인을 만들어 문서당 4만 개 한도를 넘긴다. 여기서 한 번만 파싱한다.
  */
-function unpack<T>(raw: string | undefined): Record<string, T> {
-  if (!raw) return {};
+function unpack<T>(
+  raw: string | undefined,
+  legacy?: Record<string, T>
+): Record<string, T> {
+  // JSON 문자열 전환 이전 실행이 남긴 문서는 맵을 그대로 갖고 있다.
+  // 다음 스크리너 실행 전까지 화면이 빈 상태가 되지 않도록 둘 다 받는다.
+  if (!raw) return legacy ?? {};
   try {
     return JSON.parse(raw) as Record<string, T>;
   } catch {
-    return {};
+    return legacy ?? {};
   }
 }
 
@@ -125,7 +130,7 @@ export async function fetchFlows(
   const snap = await getDoc(doc(db, "flows", market));
   if (!snap.exists()) return null;
   const d = snap.data() as FlowDoc;
-  return { ...d, tickers: unpack<FlowRow>(d.tickers_json) };
+  return { ...d, tickers: unpack<FlowRow>(d.tickers_json, d.tickers) };
 }
 
 /** DART 공시. 패턴 목록에 오른 종목만 수집된다. */
@@ -135,5 +140,5 @@ export async function fetchDisclosures(
   const snap = await getDoc(doc(db, "disclosures", market));
   if (!snap.exists()) return null;
   const d = snap.data() as DisclosureDoc;
-  return { ...d, tickers: unpack<DisclosureRow>(d.tickers_json) };
+  return { ...d, tickers: unpack<DisclosureRow>(d.tickers_json, d.tickers) };
 }

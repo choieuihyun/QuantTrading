@@ -378,8 +378,10 @@ export interface SignalRow {
 
 export interface SignalShard {
   bar_date: string;
-  /** 색인 항목 한도(문서당 4만) 때문에 JSON 문자열로 담는다 */
-  tickers_json: string;
+  /** 색인 항목 한도(문서당 4만) 때문에 JSON 문자열로 담는다.
+   *  전환 이전 실행이 남긴 문서는 tickers(맵)를 갖고 있어 둘 다 받는다. */
+  tickers_json?: string;
+  tickers?: Record<string, SignalRow>;
 }
 
 /** flows/{market} — KRX 수급·공매도·밸류에이션. 로컬 실행(enrich_local.py)에서만 채워진다 */
@@ -396,7 +398,8 @@ export interface FlowDoc {
   /** 지표별 0~100 분위 경계값(101개). 종목마다 백분위를 저장하지 않고 여기서 찾는다 */
   dist?: Record<string, number[]>;
   /** 종목별 데이터를 JSON 문자열로 담는다 — 맵으로 두면 색인 항목이 문서 한도(4만)를 넘는다 */
-  tickers_json: string;
+  tickers_json?: string;
+  tickers?: Record<string, FlowRow>;
 }
 
 /** disclosures/{market} — DART 공시. lv: c=자본조정(무상증자·분할) / m=중요공시 */
@@ -406,5 +409,6 @@ export interface DisclosureDoc {
   bar_date: string;
   count: number;
   /** 위와 같은 이유로 JSON 문자열 */
-  tickers_json: string;
+  tickers_json?: string;
+  tickers?: Record<string, DisclosureRow>;
 }
