@@ -146,8 +146,13 @@ def attach(results: dict, flows: pd.DataFrame) -> dict:
 
 
 if __name__ == "__main__":
-    # 자격증명 확인용: python investor_flow.py
-    # 로컬에서는 screener/.env 에 KRX_ID/KRX_PW를 넣어두면 읽는다 (.env는 gitignore 처리됨)
+    """전 종목 대량 조회가 되는지 확인 — 로컬 보강 경로의 구조를 정하는 시험.
+
+    종목별 조회(krx_lookup.py)는 되는 게 확인됐다. 전 종목이 한 번에 되면
+    2,600번 부르지 않고 몇 번으로 끝난다.
+    """
+    import datetime as dt
+
     env = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if os.path.exists(env):
         for line in open(env, encoding="utf-8"):
@@ -155,22 +160,49 @@ if __name__ == "__main__":
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip("'\""))
-
-    # .env도 환경변수도 없으면 직접 입력받는다 — 비밀번호가 셸 히스토리에 남지 않게
     if not available():
         import getpass
         os.environ["KRX_ID"] = input("KRX 아이디: ").strip()
         os.environ["KRX_PW"] = getpass.getpass("KRX 비밀번호(화면에 안 보임): ")
 
     ok, why = check_login()
-    print(f"\n로그인 확인: {'성공' if ok else '실패'} — {why}")
+    print(f"\n로그인: {'성공' if ok else '실패'} — {why}")
     if not ok:
         raise SystemExit(1)
 
+    from pykrx import stock
+    end = dt.date.today(); start = end - dt.timedelta(days=30)
+    f = lambda d: d.strftime("%Y%m%d")
+
+    print("\n=== 전 종목 대량 조회 가능 여부 ===")
+    trials = {
+        "투자자 순매수(외국인/KOSPI)":
+            lambda: stock.get_market_net_purchases_of_equities(f(start), f(end), "KOSPI", "외국인"),
+        "투자자 순매수(기관합계/KOSPI)":
+            lambda: stock.get_market_net_purchases_of_equities(f(start), f(end), "KOSPI", "기관합계"),
+        "공매도 거래(전종목/KOSPI)":
+            lambda: stock.get_shorting_volume_by_ticker(f(end), "KOSPI"),
+        "공매도 잔고(전종목/KOSPI)":
+            lambda: stock.get_shorting_balance_by_ticker(f(end), "KOSPI"),
+        "시가총액(전종목/KOSPI)":
+            lambda: stock.get_market_cap_by_ticker(f(end), "KOSPI"),
+        "PER/PBR(전종목/KOSPI)":
+            lambda: stock.get_market_fundamental_by_ticker(f(end), "KOSPI"),
+    }
+    for label, fn in trials.items():
+        try:
+            df = fn()
+        except Exception as e:
+            print(f"  ✗ {label:30} {type(e).__name__}: {str(e)[:60]}")
+            continue
+        if df is None or df.empty:
+            print(f"  ✗ {label:30} 빈 결과")
+            continue
+        print(f"  ✓ {label:30} {len(df):5,}종목 · {list(df.columns)}")
+
+    print("\n=== 실제 수집 (fetch) ===")
     df = fetch()
     if df.empty:
-        raise SystemExit("조회 실패 — 위 로그의 오류를 확인하세요.")
-    print(f"\n수집 {len(df):,}종목 · 컬럼 {list(df.columns)}")
-    print(df.describe().T[["count", "mean", "min", "max"]])
-    print("\n상위 5 (외인 20일 순매수액):")
-    print(df.nlargest(5, "foreign_net_20d")[["foreign_net_20d", "inst_net_20d"]])
+        raise SystemExit("수집 실패 — 위 결과를 확인하세요")
+    print(f"\n{len(df):,}종목 · 컬럼 {list(df.columns)}")
+    print(df.head(3).to_string())

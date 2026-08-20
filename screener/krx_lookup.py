@@ -19,8 +19,19 @@ import pandas as pd
 
 from investor_flow import check_login
 
-# 수급을 볼 때 궁금한 건 "누가 얼마나 샀나"다. 개인은 잔차라 따로 안 본다.
-INVESTORS = ["외국인", "기관합계"]
+# 실측 컬럼명 — "외국인"이 아니라 "외국인합계"다. 개인은 잔차라 따로 안 본다.
+INVESTORS = ["외국인합계", "기관합계"]
+
+
+def drop_incomplete(df, cols):
+    """장중이면 당일 행이 전부 0으로 온다. 그대로 평균에 넣으면 조용히 값이 깎인다."""
+    if df is None or df.empty:
+        return df
+    have = [c for c in cols if c in df.columns]
+    if not have:
+        return df
+    zero = (df[have].fillna(0) == 0).all(axis=1)
+    return df[~zero]
 
 
 def load_env():
@@ -84,30 +95,36 @@ def fetch(code: str, days: int, raw: bool) -> dict:
 
 
 def summarize(data: dict, name: str, code: str, price: float | None):
-    inv = data.get("투자자별 거래대금")
-    if inv is not None:
-        cols = [c for c in INVESTORS if c in inv.columns]
-        if cols:
-            print(f"\n■ 순매수 거래대금 누적 ({len(inv)}거래일)")
-            for c in cols:
-                v = pd.to_numeric(inv[c], errors="coerce").sum()
-                print(f"   {c:8} {v/1e8:+12,.1f}억")
-            print(f"\n   최근 5일")
-            print(inv[cols].tail(5).apply(lambda s: (s / 1e8).round(1)).to_string())
+    cap = data.get("시가총액")
+    marcap = float(cap["시가총액"].iloc[-1]) if cap is not None and "시가총액" in cap else None
 
-    sh = data.get("공매도 거래")
-    if sh is not None:
-        vol = next((c for c in ("공매도", "공매도거래량") if c in sh.columns), None)
-        tot = next((c for c in ("거래량", "총거래량") if c in sh.columns), None)
-        if vol and tot:
-            a = pd.to_numeric(sh[vol], errors="coerce").sum()
-            b = pd.to_numeric(sh[tot], errors="coerce").sum()
-            print(f"\n■ 공매도 비중 {a/b*100:.2f}%  (공매도 {a:,.0f} / 전체 {b:,.0f})")
+    inv = drop_incomplete(data.get("투자자별 거래대금"), INVESTORS)
+    if inv is not None and len(inv):
+        cols = [c for c in INVESTORS if c in inv.columns]
+        print(f"\n■ 순매수 거래대금 누적 ({len(inv)}거래일)")
+        for c in cols:
+            v = pd.to_numeric(inv[c], errors="coerce").sum()
+            # 원화 절대액은 대형주가 항상 이긴다. 시총 대비 비율이라야 종목 간 비교가 된다.
+            pct = f" ({v / marcap * 100:+.2f}% of 시총)" if marcap else ""
+            print(f"   {c:10} {v/1e8:+12,.1f}억{pct}")
+        print("\n   최근 5일 (억원)")
+        print(inv[cols].tail(5).apply(lambda s: (s / 1e8).round(0)).to_string())
+
+    sh = drop_incomplete(data.get("공매도 거래"), ["공매도", "매수"])
+    if sh is not None and len(sh) and "비중" in sh.columns:
+        w = pd.to_numeric(sh["비중"], errors="coerce")
+        print(f"\n■ 공매도 거래비중 — 평균 {w.mean():.2f}% · 최근 {w.iloc[-1]:.2f}% · 최고 {w.max():.2f}%")
 
     bal = data.get("공매도 잔고")
-    if bal is not None and len(bal):
-        print(f"\n■ 공매도 잔고 최근")
-        print(bal.tail(3).to_string())
+    if bal is not None and len(bal) and "비중" in bal.columns:
+        w = pd.to_numeric(bal["비중"], errors="coerce")
+        arrow = "↑" if len(w) > 1 and w.iloc[-1] > w.iloc[0] else "↓"
+        print(f"■ 공매도 잔고비중 — 최근 {w.iloc[-1]:.2f}% ({w.iloc[0]:.2f}% → {w.iloc[-1]:.2f}% {arrow})")
+
+    val = drop_incomplete(data.get("PER/PBR/배당"), ["PER", "PBR", "EPS"])
+    if val is not None and len(val):
+        r = val.iloc[-1]
+        print(f"■ PER {r.get('PER')} · PBR {r.get('PBR')} · EPS {r.get('EPS'):,} · 배당수익률 {r.get('DIV')}%")
 
 
 def main():
