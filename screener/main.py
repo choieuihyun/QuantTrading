@@ -8,6 +8,7 @@ import backtest
 import tracker
 import investor_flow
 import explain
+import watchlist
 from market_config import ALL_CONFIGS
 
 PATTERN_NAMES = {
@@ -144,6 +145,17 @@ def main():
         rows = (all_meta.get(market_key) or {}).get("rows") or []
         if not rows:
             continue
+        # 돌파 대기 — 스크리너가 하루 3번만 도니 발동가를 미리 알아야 알림을 걸 수 있다
+        try:
+            wl = watchlist.build(rows, cfg)
+            print(f"  {watchlist.summarize(wl)}")
+            firebase_upload.save_watchlist(market_key, wl, all_meta[market_key].get("bar_date"))
+        except Exception as e:
+            import traceback
+            print(f"  ⚠ [{market_key}] 돌파 대기 업로드 실패: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            upload_failures.append(f"watchlist/{market_key}: {type(e).__name__}: {e}")
+
         try:
             thr = cfg.get("score_threshold", screener.SCORE_THRESHOLD)
             firebase_upload.save_signals(

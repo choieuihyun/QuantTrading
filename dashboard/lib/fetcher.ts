@@ -4,6 +4,7 @@ import type {
   ScreenerResult, Fundamentals, ReplayGrid, MarketKey,
   ReplayPickDoc, ReplayPickIndex, ScorecardDoc, ScorecardIndex, PriceDoc,
   SignalIndex, SignalShard, SignalRow, FlowDoc, FlowRow, DisclosureDoc, DisclosureRow,
+  WatchDoc, WatchRow,
 } from "./types";
 
 export async function fetchLatestResult(): Promise<ScreenerResult | null> {
@@ -141,4 +142,17 @@ export async function fetchDisclosures(
   if (!snap.exists()) return null;
   const d = snap.data() as DisclosureDoc;
   return { ...d, tickers: unpack<DisclosureRow>(d.tickers_json, d.tickers) };
+}
+
+/** 돌파 대기 — 발동가까지 가까운 순. 하루 3번 갱신된다. */
+export async function fetchWatchlist(market: MarketKey): Promise<WatchDoc | null> {
+  const snap = await getDoc(doc(db, "watchlist", market));
+  if (!snap.exists()) return null;
+  const d = snap.data() as WatchDoc;
+  // 이쪽만 배열이라 unpack(맵 전용)을 쓰지 않는다
+  let rows: WatchRow[] = d.rows ?? [];
+  if (d.rows_json) {
+    try { rows = JSON.parse(d.rows_json) as WatchRow[]; } catch { /* 구버전 문서 */ }
+  }
+  return { ...d, rows };
 }

@@ -415,3 +415,19 @@ export interface DisclosureDoc {
   tickers_json?: string;
   tickers?: Record<string, DisclosureRow>;
 }
+
+/** watchlist/{market} — 아직 발동하지 않은 패턴의 발동가. 매수 신호가 아니다. */
+export interface WatchRow {
+  t: string; n: string;
+  /** 패턴 키 — 무엇을 기다리는 중인지 */
+  k: string;
+  lb: string; ef: string;
+  pr: number; tg: number; g: number;
+  st?: number | null; sl?: number | null; rs?: number | null;
+}
+export interface WatchDoc {
+  bar_date: string;
+  count: number;
+  rows_json?: string;
+  rows?: WatchRow[];
+}

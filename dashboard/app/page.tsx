@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockTable } from "@/components/StockTable";
 import { PatternGuideModal } from "@/components/PatternGuideModal";
+import { BreakoutWatch } from "@/components/BreakoutWatch";
 import { fetchLatestResult } from "@/lib/fetcher";
 import type { PatternKey, MarketKey, Stock } from "@/lib/types";
 
@@ -163,6 +164,10 @@ export default function Home() {
           </div>
           </>
         ) : null}
+
+        {/* 패턴 목록보다 위에 둔다 — 목록은 '이미 발동한 것'이고 이쪽은 '아직 안 온 것'이라,
+            늦지 않으려면 이쪽을 먼저 봐야 한다 */}
+        {market === "kr" && <BreakoutWatch market={market} />}
 
         <Tabs defaultValue="common_trend">
           {/* TabsList 기본값이 가로 탭 전제(inline-flex·w-fit·h-8)라 그룹 레이아웃과 충돌한다.

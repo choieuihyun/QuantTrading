@@ -204,6 +204,24 @@ def _reject_nested_arrays(o, path=""):
             _reject_nested_arrays(v, f"{path}[{i}]")
 
 
+def save_watchlist(market: str, rows: list, bar_date: str):
+    """
+    돌파 대기 — 발동가와 그때까지의 거리.
+
+    패턴 목록과 분리한 이유는 성격이 다르기 때문이다. 목록은 "조건이 충족된 종목"이고
+    이쪽은 "아직 충족되지 않은 종목의 발동 조건"이다. 매수 신호가 아니다.
+    """
+    _init_app()
+    db = firestore.client()
+    db.collection("watchlist").document(market).set({
+        "bar_date": bar_date,
+        "run_at": datetime.now(timezone.utc),
+        "count": len(rows),
+        "rows_json": _packed(rows, "watchlist"),
+    })
+    print(f"Uploaded → watchlist/{market} ({len(rows)}종목, 기준 {bar_date})")
+
+
 def save_signals(market: str, shards: dict, labels: dict, bar_date: str, threshold: float):
     """
     종목별 패턴 판정 — "이 종목이 왜 목록에 없지?"에 답하는 데이터.
