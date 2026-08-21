@@ -15,6 +15,8 @@ export interface PatternGuide {
   conditions?: GuideRow[];
   scoring?: string;
   period?: string;
+  /** 원전이 말하는 매수 시점 + 그 시점에 대한 우리 실측. 둘을 분리해서 적는다. */
+  buy?: string;
   note?: string;
 }
 
@@ -23,6 +25,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   common_trend: {
     title: "★ 돌파 공통",
     tagline: "서로 다른 방식으로 '저항 돌파'를 확인한 종목",
+    buy:
+      "구성 패턴들이 전부 '돌파 확인' 방식이라 이 목록도 늦습니다.\n" +
+      "실측 −0.20% ↔ +1.40%로 표본 창에 따라 부호가 바뀝니다. 겹침이 이득이라는 근거는 여전히 없습니다.",
     composition: "Stage 2 + CAN SLIM + Darvas + VCP 중 2개 이상 해당",
     concept:
       "네 기법 모두 '저항을 뚫는 순간'을 잡습니다 — 베이스 저항(Stage 2), 신고가(CAN SLIM),\n" +
@@ -42,6 +47,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   common_accum: {
     title: "★ 매집 공통",
     tagline: "거래범위 안에서 매집이 확인된 종목",
+    buy:
+      "Wyckoff와 동일한 종목이 뜹니다 (구성상 사실상 같은 목록).\n" +
+      "실측 +0.18% ~ +0.26%. 매수 시점 근거 없음.",
     composition: "Wyckoff 단독 (현재 구성 1개)",
     concept:
       "아직 크게 오르지 않았지만 거래범위 안에서 매도 압력이 마르고 있는 종목 — 선행 진입형.\n" +
@@ -57,6 +65,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   common_all: {
     title: "☆ 내 패턴 공통",
     tagline: "자체 개발 3패턴 중 2개 이상 — 외부 검증 없음",
+    buy:
+      "자체 패턴 2개 이상 통과. 원전이 없으므로 매수 시점 규칙도 없습니다.\n" +
+      "실측 −1.14% ~ −0.73%로 두 표본 모두 음수입니다.",
     composition: "P1(정배열+매집) + P2(5일선추세) + P3(눌림목) 중 2개 이상",
     concept:
       "한국 시장 특성에 맞춘 단기~스윙 진입 신호.\n" +
@@ -73,6 +84,10 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
     title: "CAN SLIM",
     author: "William O'Neil — IBD 창시자",
     tagline: "신고가 + 거래량 + RS Rating 70↑ + 상승장에서만 매수",
+    buy:
+      "원전: 손잡이(handle) 고점을 거래량 급증과 함께 종가로 돌파하는 날. 손절 −7~8%.\n" +
+      "우리: 손잡이를 계산하지 않으므로 '52주 고점 25% 이내 + 거래량 2배'로 근사합니다 — 원전의 매수 지점이 아닙니다. 실측 선정력은 표본 창에 따라 −0.38% ~ +0.80%로 부호가 바뀝니다.\n" +
+      "결론: 이 화면만으로 매수 시점을 정할 근거가 없습니다.",
     concept:
       "원전 7개 조건 중 N·S·L·M 4개를 구현했습니다.\n" +
       "L(주도주)은 IBD 방식 RS Rating — 코스피 대비 초과수익이 아니라 전 종목 백분위입니다.",
@@ -93,6 +108,11 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
     title: "VCP",
     author: "Mark Minervini — US 투자 챔피언십 우승",
     tagline: "조정이 연속으로 얕아지는 수축 + Trend Template 통과",
+    buy:
+      "원전(Minervini): 마지막 수축의 고점(피벗)을 거래량 급증과 함께 돌파하는 순간. 손절 −7~8%.\n" +
+      "우리: 게이트가 Trend Template을 요구해 대부분 이미 오른 뒤에 뜹니다 — 통과 시점의 피벗 대비 중앙값 +21.7%, 원전 매수구간(0~5%)은 10%뿐입니다. 절반은 이미 +20%를 넘긴 상태입니다.\n" +
+      "실측: 피벗 0~5%가 +1.57%로 가장 나았으나 t 0.88로 확정이 아니고, VCP 전체 선정력은 −0.68% ~ −0.27%로 표본 창에 따라 흔들립니다.\n" +
+      "결론: 목록에 떴다고 사는 자리가 아닙니다. 피벗 대비 거리를 먼저 보고, 이미 크게 벗어났으면 원전 기준으로는 지나간 자리입니다. 원전 손절이 −20%를 넘는 경우가 흔한 것도 확인하세요.",
     concept:
       "큰 조정 → 중간 조정 → 작은 조정으로 '점점 얕아지는' 연속성이 VCP의 정체성입니다.\n" +
       "단순히 '지금 변동성이 낮다'는 것과 다릅니다.\n" +
@@ -114,6 +134,11 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
     title: "Stage 2",
     author: "Stan Weinstein — 4단계 이론",
     tagline: "30주선 위 + 우상향 + 베이스 저항을 거래량 동반 돌파",
+    buy:
+      "원전(Weinstein): Stage 1 횡보를 마치고 베이스 저항을 거래량과 함께 돌파할 때. 30주선 위 유지.\n" +
+      "우리: 통과 시점의 저항 대비 중앙값 +4.8%로 네 패턴 중 가장 이릅니다 (절반이 5% 이내).\n" +
+      "실측: 선정력 +1.39% ~ +2.11%로 표본 창을 바꿔도 부호는 유지된 유일한 패턴입니다. 다만 상위 20종목의 동점 비율이 20%라 순위 자체는 절반쯤 무의미하고, t는 2를 넘지 못합니다.\n" +
+      "결론: 네 패턴 중 근거가 가장 나은 편이지만 '확정'은 아닙니다. 늦게 잡혀도 불리하지 않았습니다 (저항 +20% 초과 구간이 +5.55%로 오히려 최고).",
     concept:
       "Stage 1: 횡보(바닥) → Stage 2: 상승 전환 ★매수 → Stage 3: 천장 → Stage 4: 하락\n" +
       "핵심은 '이미 오르는 상태'가 아니라 베이스 저항을 뚫는 '전환 시점'입니다.",
@@ -133,6 +158,11 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
     title: "Wyckoff 매집",
     author: "Richard Wyckoff — 스마트머니 추적의 원류",
     tagline: "거래범위 안에서 Spring 또는 SOS + 하락일 거래량 소진",
+    buy:
+      "원전: Spring(가짜 하락 후 회복) 다음 반등, 또는 SOS(강세 신호) 확인 후 되돌림.\n" +
+      "우리: 매집 국면을 잡으므로 55%가 돌파 전에 뜹니다 — 네 패턴 중 가장 이릅니다.\n" +
+      "실측: Spring·SOS를 요구한 본체가 +0.16% ~ +0.36%인데, 그 조건을 빼고 '거래범위 안'만 봐도 +1.06% ~ +1.13%로 오히려 높았습니다. 거래량이 마르는 조건도 값을 더하지 않았습니다.\n" +
+      "결론: Spring·SOS를 기다릴 근거가 없습니다. 다만 대안 쪽도 t가 2를 넘지 못해 매수 규칙으로 쓸 수 없습니다.",
     concept:
       "PS → SC(매도절정) → AR → ST → Spring(최후 흔들기) → LPS → SOS(강도 표시) → 상승\n" +
       "이 중 구조로 확인 가능한 Spring·SOS·거래량 소진만 구현했습니다.",
@@ -152,6 +182,11 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
     title: "Darvas Box",
     author: "Nicolas Darvas — 2년 만에 200만 달러",
     tagline: "박스 천장 돌파 + 거래량. 손절은 박스 바닥",
+    buy:
+      "원전(Darvas): 박스 천장을 종가로 돌파 + 거래량 급증. 손절은 박스 바닥.\n" +
+      "우리: 게이트에 돌파 확인이 들어 있어 돌파 전에 뜨는 경우가 0%입니다 — 구조적으로 항상 늦습니다.\n" +
+      "실측: 선정력이 −1.08% ~ +0.53%로 표본 창에 따라 부호가 뒤집힙니다. 원전 매수구간(천장 0~5%)이 −1.19%로 오히려 나빴던 측정도 있습니다.\n" +
+      "결론: 돌파를 확인하고 사는 근거가 없습니다. 손절(박스 바닥)만은 원전대로 명확합니다.",
     concept:
       "신고가가 3봉 동안 경신되지 않으면 그 고가가 박스 천장.\n" +
       "이후 최저가가 3봉을 버티면 박스 바닥. 천장을 종가로 넘으면 매수.",
@@ -170,6 +205,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   p1: {
     title: "정배열 퍼지기 직전 + 매집",
     tagline: "이평선이 막 정렬되려는 시점 + 스마트머니 매집 신호 포착",
+    buy:
+      "자체 패턴이라 대조할 원전이 없습니다 — 매수 시점을 정해주는 규칙이 원래 없습니다.\n" +
+      "실측 선정력 −0.02% ~ +0.42%. 관심종목 추림 용도로만 쓰세요.",
     concept:
       "진입 논리: 정배열이 완성되기 직전이 가장 수익률이 높은 진입 타이밍.\n" +
       "필수조건 — 부분 정배열 + (OBV 상승 또는 볼린저 수축). 나머지는 가산점입니다.",
@@ -193,6 +231,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   p2: {
     title: "5일선 추세 + 거래량 터짐",
     tagline: "5일선 이탈 없이 타고 올라가는 종목 (한국 시장 단기 추세 핵심)",
+    buy:
+      "자체 패턴. 원전 없음.\n" +
+      "실측 선정력 −1.33% ~ −0.39%로 두 표본 모두 음수입니다 — 이 목록을 근거로 사지 마세요.",
     concept: "진입 논리: 5일선 지지 + 거래량 급증 = 강한 추세 확인",
     conditions: [
       { cond: "완전 정배열", ind: "full_aligned", crit: "MA5 > MA20 > MA60 > MA120" },
@@ -214,6 +255,9 @@ export const PATTERN_GUIDE: Record<PatternKey, PatternGuide> = {
   p3: {
     title: "눌림목",
     tagline: "상승 추세 중 일시적 조정 후 재진입 타이밍",
+    buy:
+      "자체 패턴. 원전 없음.\n" +
+      "실측 선정력이 +0.54% ↔ −1.12%로 표본 창에 따라 부호가 완전히 뒤집힙니다. 어느 쪽도 믿을 수 없다는 뜻입니다.",
     concept: "진입 논리: 피보나치 되돌림 구간에서 MA20 지지 + MACD 반등 = 재상승 신호",
     conditions: [
       { cond: "조정 범위", ind: "is_pullback_range", crit: "고점 대비 -3% ~ -15%" },

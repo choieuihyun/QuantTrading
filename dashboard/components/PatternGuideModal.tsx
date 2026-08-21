@@ -36,6 +36,17 @@ export function PatternGuideModal({ pattern, onClose }: Props) {
           </pre>
         )}
 
+        {/* "언제 사냐"가 제일 먼저 궁금한 질문인데 지금까지 어디에도 안 적혀 있었다.
+            원전이 말하는 시점과 우리 실측을 분리해서 적는다 — 둘이 자주 어긋난다. */}
+        {g.buy && (
+          <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/[0.07] px-3 py-2.5">
+            <span className="text-xs font-semibold text-emerald-300">언제 사는가</span>
+            <pre className="mt-1 text-xs text-white/75 leading-relaxed whitespace-pre-wrap font-sans">
+              {g.buy}
+            </pre>
+          </div>
+        )}
+
         {g.conditions && (
           <div className="rounded-lg border border-white/10 overflow-hidden">
             <table className="w-full text-sm">
